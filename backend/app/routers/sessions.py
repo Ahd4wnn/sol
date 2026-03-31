@@ -1,0 +1,92 @@
+import logging
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from app.middleware.auth import get_current_user
+from app.services.supabase_client import supabase
+from app.models.schemas import CreateSessionRequest, UpdateSessionRequest
+from app.services.summarizer import summarize_session
+
+logger = logging.getLogger("sol")
+router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+@router.post("/create")
+def create_session(payload: CreateSessionRequest, user=Depends(get_current_user)):
+    try:
+        supabase.table("profiles").upsert({"id": user.id}).execute()
+        
+        data = {
+            "user_id": user.id,
+            "title": payload.title,
+            "mood_before": payload.mood_before,
+            "mood_word": payload.mood_word,
+            "opening_context": payload.opening_context
+        }
+        res = supabase.table("therapy_sessions").insert(data).execute()
+        return res.data[0] if (hasattr(res, 'data') and len(res.data) > 0) else None
+    except Exception as e:
+        logger.error(f"create_session failed for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+
+@router.get("/list")
+def list_sessions(user=Depends(get_current_user)):
+    try:
+        res = supabase.table("therapy_sessions").select("*, messages(count)").eq("user_id", user.id).order("created_at", desc=True).execute()
+        sessions = res.data if hasattr(res, 'data') else []
+        for s in sessions:
+            msgs = s.get('messages', [])
+            s['message_count'] = msgs[0].get('count', 0) if isinstance(msgs, list) and len(msgs) > 0 else 0
+        return sessions
+    except Exception as e:
+        logger.error(f"list_sessions failed for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+
+@router.get("/{session_id}")
+def get_session(session_id: str, user=Depends(get_current_user)):
+    try:
+        session_res = supabase.table("therapy_sessions").select("*").eq("id", session_id).eq("user_id", user.id).limit(1).execute()
+        if not hasattr(session_res, 'data') or len(session_res.data) == 0:
+            raise HTTPException(status_code=403, detail={"error": True, "message": "Session not found or access denied"})
+            
+        session = session_res.data[0]
+        msgs_res = supabase.table("messages").select("*").eq("session_id", session_id).order("created_at", desc=False).execute()
+        session["messages"] = msgs_res.data if hasattr(msgs_res, 'data') else []
+        
+        return session
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"get_session failed for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+
+@router.patch("/{session_id}")
+def update_session(session_id: str, payload: UpdateSessionRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
+    try:
+        check_res = supabase.table("therapy_sessions").select("id").eq("id", session_id).eq("user_id", user.id).limit(1).execute()
+        if not hasattr(check_res, 'data') or len(check_res.data) == 0:
+            raise HTTPException(status_code=403, detail={"error": True, "message": "Access denied"})
+            
+        update_data = {}
+        if payload.title is not None: update_data["title"] = payload.title
+        if payload.mood_after is not None: update_data["mood_after"] = payload.mood_after
+        if payload.summary is not None: update_data["summary"] = payload.summary
+            
+        if update_data:
+            supabase.table("therapy_sessions").update(update_data).eq("id", session_id).execute()
+            
+        if payload.mood_after is not None and payload.summary is None:
+            background_tasks.add_task(summarize_session, session_id, user.id)
+            
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"update_session failed for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+
+@router.delete("/{session_id}")
+def delete_session(session_id: str, user=Depends(get_current_user)):
+    try:
+        supabase.table("therapy_sessions").delete().eq("id", session_id).eq("user_id", user.id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"delete_session failed for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})

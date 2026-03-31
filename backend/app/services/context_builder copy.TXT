@@ -1,0 +1,51 @@
+from typing import Dict, Any
+from app.services.supabase_client import supabase
+
+async def build_context(user_id: str, session_id: str) -> Dict[str, Any]:
+    # 1. Fetch intake responses (personality_profile)
+    intake_res = supabase.table("intake_responses").select("personality_profile").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+    personality_profile = intake_res.data[0].get("personality_profile", {}) if (hasattr(intake_res, 'data') and len(intake_res.data) > 0) else {}
+
+    # 1.5 Fetch user profile settings
+    profiles_res = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+    user_profile = profiles_res.data[0] if (hasattr(profiles_res, 'data') and len(profiles_res.data) > 0) else {}
+
+    # 2. Fetch last 20 messages from current session
+    msgs_res = supabase.table("messages").select("role, content").eq("session_id", session_id).order("created_at", desc=True).limit(20).execute()
+    current_messages = msgs_res.data[::-1] if (hasattr(msgs_res, 'data') and len(msgs_res.data) > 0) else []
+
+    # 3. Fetch all memory_notes
+    notes_res = supabase.table("memory_notes").select("note, tags").eq("user_id", user_id).order("created_at", desc=True).execute()
+    all_notes = notes_res.data if (hasattr(notes_res, 'data') and len(notes_res.data) > 0) else []
+    
+    memory_notes = []
+    relationship_notes = []
+    
+    for n in all_notes:
+        tags = n.get("tags", [])
+        if "crisis_flag" in tags:
+            continue
+        if "relationship" in tags:
+            relationship_notes.append(n.get("note", ""))
+        else:
+            memory_notes.append(n.get("note", ""))
+
+    # 4. Fetch current session metadata
+    session_res = supabase.table("therapy_sessions").select("title, mood_before, mood_word, opening_context").eq("id", session_id).limit(1).execute()
+    session_metadata = session_res.data[0] if (hasattr(session_res, 'data') and len(session_res.data) > 0) else {}
+
+    # 5. Fetch last 3 session summaries
+    summaries_res = supabase.table("therapy_sessions").select("summary").eq("user_id", user_id).neq("id", session_id).order("created_at", desc=True).limit(10).execute()
+    past_session_summaries = []
+    if hasattr(summaries_res, 'data') and len(summaries_res.data) > 0:
+        past_session_summaries = [s["summary"] for s in summaries_res.data if s.get("summary")][:3]
+
+    return {
+        "personality_profile": personality_profile,
+        "user_profile": user_profile,
+        "current_messages": current_messages,
+        "memory_notes": memory_notes,
+        "relationship_notes": relationship_notes,
+        "session_metadata": session_metadata,
+        "past_session_summaries": past_session_summaries
+    }

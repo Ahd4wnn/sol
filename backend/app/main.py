@@ -1,0 +1,73 @@
+import logging
+import time
+from fastapi import FastAPI, Request, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
+from app.routers import auth, sessions, profile, agent, memory, messages
+from app.services.supabase_client import supabase
+
+logging.basicConfig(
+  level=logging.INFO,
+  format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+logger = logging.getLogger("sol")
+
+app = FastAPI(title="Sol API", version="1.0.0")
+
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=[settings.frontend_url, "http://localhost:5173"],
+  allow_credentials=True,
+  allow_methods=["*"],
+  allow_headers=["*"],
+)
+
+# Request timing middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+  start = time.time()
+  logger.info(f"→ {request.method} {request.url.path}")
+  try:
+    response = await call_next(request)
+    duration = (time.time() - start) * 1000
+    if request.url.path != '/health':
+        logger.info(f"← {request.method} {request.url.path} {response.status_code} ({duration:.0f}ms)")
+    return response
+  except Exception as e:
+    logger.error(f"✗ {request.method} {request.url.path} CRASHED: {e}")
+    raise
+
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth.router)
+api_router.include_router(sessions.router)
+api_router.include_router(profile.router)
+api_router.include_router(agent.router)
+api_router.include_router(memory.router)
+api_router.include_router(messages.router)
+
+app.include_router(api_router)
+
+@app.get("/health")
+async def health():
+  try:
+    result = supabase.table("profiles").select("id").limit(1).execute()
+    db_status = "ok"
+  except Exception as e:
+    logger.error(f"Supabase health check failed: {e}")
+    db_status = "error"
+  
+  return {
+    "status": "ok",
+    "service": "Sol API",
+    "database": db_status,
+    "timestamp": time.time()
+  }
+
+@app.on_event("startup")
+async def startup():
+  logger.info("━━━━━━━━━━━━━━━━━━━━━━━━")
+  logger.info("  Sol API starting up...")
+  logger.info(f"  Frontend URL: {settings.frontend_url}")
+  logger.info(f"  Supabase: {settings.supabase_url[:30]}...")
+  logger.info(f"  OpenAI: {'configured' if settings.openai_api_key else 'MISSING'}")
+  logger.info("━━━━━━━━━━━━━━━━━━━━━━━━")
