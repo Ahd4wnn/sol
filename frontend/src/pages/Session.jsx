@@ -31,21 +31,42 @@ export default function Session() {
   const [showEndModal, setShowEndModal] = useState(false);
   const [endMood, setEndMood] = useState(null);
   const [isEnding, setIsEnding] = useState(false);
+  const [billingStatus, setBillingStatus] = useState(null);
 
   const bottomRef = useRef(null);
-  const hasUserScrolled = useRef(false);
+  const chatContainerRef = useRef(null);
+  const userHasScrolledUp = useRef(false);
+  const lastScrollTop = useRef(0);
+  const inputRef = useRef(null);
   const hasAutoStarted = useRef(false);
 
   const handleScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
-    hasUserScrolled.current = scrollHeight - scrollTop - clientHeight > 50;
+    if (scrollTop < lastScrollTop.current) {
+      userHasScrolledUp.current = true;
+    }
+    lastScrollTop.current = scrollTop;
+
+    if (scrollHeight - scrollTop - clientHeight < 60) {
+      userHasScrolledUp.current = false;
+    }
   };
 
   useEffect(() => {
-    if (!hasUserScrolled.current) {
+    api.get('/api/billing/status').then(r => setBillingStatus(r.data)).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (isStreaming || !userHasScrolledUp.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [dbMessages, isStreaming]);
+
+  useEffect(() => {
+    if (!isStreaming && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isStreaming]);
 
   useEffect(() => {
     if (
@@ -70,11 +91,14 @@ export default function Session() {
   const handleSend = (e) => {
     if (e) e.preventDefault();
     if (!input.trim() || isStreaming) return;
+    userHasScrolledUp.current = false;
     sendMessage(input);
     setInput('');
-    const textarea = document.getElementById('chat-input');
-    if (textarea) textarea.style.height = 'auto';
-    hasUserScrolled.current = false;
+    const textarea = inputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.focus();
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -156,16 +180,34 @@ export default function Session() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => setShowEndModal(true)}
-            className="px-4 py-1.5 text-sm font-medium text-sol-primary border border-sol-primary rounded-full hover:bg-sol-primary hover:text-white transition-colors shrink-0 whitespace-nowrap"
-          >
-            End Session
-          </button>
+          <div className="flex items-center gap-4 shrink-0">
+            {billingStatus && !billingStatus.is_pro && (
+              <span style={{
+                fontSize: 12,
+                color: billingStatus.messages_remaining <= 5 ? '#C0392B' : '#9E8E7E',
+                fontFamily: 'DM Sans, sans-serif',
+              }}>
+                {billingStatus.messages_remaining} messages left
+                {billingStatus.messages_remaining <= 5 && ' — '}
+                {billingStatus.messages_remaining <= 5 && (
+                  <a href="/upgrade" style={{ color: '#C96B2E', textDecoration: 'underline' }}>
+                    Upgrade
+                  </a>
+                )}
+              </span>
+            )}
+            <button
+              onClick={() => setShowEndModal(true)}
+              className="px-4 py-1.5 text-sm font-medium text-sol-primary border border-sol-primary rounded-full hover:bg-sol-primary hover:text-white transition-colors whitespace-nowrap"
+            >
+              End Session
+            </button>
+          </div>
         </header>
 
         {/* Chat Area */}
         <main
+          ref={chatContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-4 md:px-8 pt-8 pb-32 md:pb-36"
         >
@@ -202,7 +244,9 @@ export default function Session() {
         <footer className="fixed bottom-[64px] md:bottom-0 w-[100vw] md:w-[calc(100vw-240px)] bg-white border-t border-sol-border px-4 py-4 md:px-8 z-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
           <div className="max-w-3xl mx-auto relative flex items-end gap-3 bg-sol-bg border border-sol-border rounded-[24px] rounded-br-[12px] p-2 pr-3 focus-within:border-sol-primary/50 focus-within:ring-1 focus-within:ring-sol-primary/50 transition-all shadow-sm">
             <textarea
+              ref={inputRef}
               id="chat-input"
+              autoFocus
               value={input}
               onChange={handleInput}
               onKeyDown={handleKeyDown}

@@ -57,6 +57,14 @@ export function useChat(sessionId, setMessages) {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
+        const code = errData?.detail?.code || errData?.code;
+
+        if (res.status === 402 || code === 'TRIAL_EXCEEDED') {
+          // Redirect to upgrade page
+          window.location.href = '/paywall';
+          return;
+        }
+
         throw new Error(
           errData?.detail?.message ||
           errData?.message ||

@@ -9,65 +9,115 @@ logger = logging.getLogger("sol")
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 @router.post("/intake")
-def save_intake(payload: IntakeRequest, user=Depends(get_current_user)):
-    user_id = user.id
-    
+async def save_intake(payload: dict, user=Depends(get_current_user)):
     try:
-        # Save to intake_responses
-        intake_data = {
-            "user_id": user_id,
-            "responses": payload.responses,
-            "personality_profile": payload.personality_profile.model_dump()
-        }
-        supabase.table("intake_responses").insert(intake_data).execute()
-        
-        # Update user profile
-        supabase.table("profiles").update({"onboarding_completed": True}).eq("id", user_id).execute()
-        
-        return {"status": "success", "message": "Intake completed successfully"}
+        responses = payload.get("responses", {})
+        personality_profile = payload.get("personality_profile", {})
+
+        # Upsert intake responses
+        existing = supabase.table("intake_responses")\
+            .select("id")\
+            .eq("user_id", user.id)\
+            .limit(1).execute()
+
+        if existing.data:
+            supabase.table("intake_responses")\
+                .update({
+                    "responses": responses,
+                    "personality_profile": personality_profile,
+                })\
+                .eq("user_id", user.id).execute()
+        else:
+            supabase.table("intake_responses").insert({
+                "user_id": user.id,
+                "responses": responses,
+                "personality_profile": personality_profile,
+            }).execute()
+
+        # Mark onboarding complete
+        supabase.table("profiles")\
+            .update({"onboarding_completed": True})\
+            .eq("id", user.id).execute()
+
+        logger.info(f"Intake saved for user {user.id}")
+        return {"success": True}
+
     except Exception as e:
-        logger.error(f"save_intake failed for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+        logger.error(f"save_intake failed for user {user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": True, "message": "Could not save intake responses"}
+        )
 
 @router.get("/me")
-def get_me(user=Depends(get_current_user)):
-    user_id = user.id
+def get_profile(user=Depends(get_current_user)):
     try:
-        # Upsert profile to ensure it exists (acting as the trigger)
-        supabase.table("profiles").upsert({"id": user_id}).execute()
-        
-        # Fetch profile
-        profile_res = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
-        
-        profile_data = profile_res.data[0] if (hasattr(profile_res, 'data') and len(profile_res.data) > 0) else None
-        if not profile_data:
-            return {"profile": None, "personality_profile": None}
-            
-        # Fetch personality profile if available
-        intake_res = supabase.table("intake_responses").select("personality_profile, responses").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
-        intake_data = intake_res.data[0] if (hasattr(intake_res, 'data') and len(intake_res.data) > 0) else None
-        
-        res_payload = {
-            "profile": profile_data,
-            "personality_profile": intake_data.get("personality_profile") if intake_data else None,
-            "intake_responses": intake_data.get("responses") if intake_data else None
-        }
-        return res_payload
+        # Try to get existing profile
+        res = supabase.table("profiles")\
+            .select("*")\
+            .eq("id", user.id)\
+            .limit(1).execute()
+
+        if hasattr(res, 'data') and res.data and len(res.data) > 0:
+            profile = res.data[0]
+        else:
+            # Auto-create profile on first login (use upsert to be safe against race conditions)
+            logger.info(f"Auto-creating profile for user {user.id}")
+            metadata = user.user_metadata if hasattr(user, 'user_metadata') and user.user_metadata else {}
+            new_profile = {
+                "id": user.id,
+                "full_name": metadata.get("full_name", ""),
+                "onboarding_completed": False,
+            }
+            create_res = supabase.table("profiles")\
+                .upsert(new_profile).execute()
+            profile = create_res.data[0] if (hasattr(create_res, 'data') and create_res.data) else new_profile
+
+        # Get intake responses separately
+        intake_res = supabase.table("intake_responses")\
+            .select("personality_profile, responses")\
+            .eq("user_id", user.id)\
+            .order("created_at", desc=True)\
+            .limit(1).execute()
+
+        if hasattr(intake_res, 'data') and intake_res.data:
+            profile["personality_profile"] = intake_res.data[0].get("personality_profile")
+            profile["intake_responses"] = intake_res.data[0].get("responses")
+
+        return profile
+
     except Exception as e:
-        logger.error(f"get_me failed for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+        logger.error(f"get_profile failed for user {user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": True, "message": "Could not load profile"}
+        )
 
 @router.patch("/update")
-def update_profile(payload: UpdateProfileRequest, user=Depends(get_current_user)):
-    update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
-    if not update_data:
-        return {"status": "success"}
+async def update_profile(payload: dict, user=Depends(get_current_user)):
     try:
-        supabase.table("profiles").update(update_data).eq("id", user.id).execute()
-        return {"status": "success"}
+        allowed_fields = [
+            "preferred_name", "full_name", "life_phase",
+            "life_goal", "current_situation", "persistent_context",
+            "therapist_settings", "avatar_url"
+        ]
+        update_data = {k: v for k, v in payload.items() if k in allowed_fields}
+
+        if not update_data:
+            return {"success": True, "message": "Nothing to update"}
+
+        supabase.table("profiles")\
+            .update(update_data)\
+            .eq("id", user.id).execute()
+
+        return {"success": True}
+
     except Exception as e:
-        logger.error(f"update_profile failed for user {user.id}: {e}")
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+        logger.error(f"update_profile failed for user {user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": True, "message": "Could not update profile"}
+        )
 
 @router.patch("/therapist-settings")
 def update_therapist_settings(payload: UpdateTherapistSettingsRequest, user=Depends(get_current_user)):

@@ -1,431 +1,696 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { api } from '../lib/axios';
-import { useAuth } from '../context/AuthContext';
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '../context/AuthContext'
+import api from '../lib/api'
 
-const questions = [
+const TOTAL_QUESTIONS = 11
+
+const QUESTIONS = [
   {
     id: 'q0',
-    title: "What should Sol call you?",
-    subtext: "This can be your name, a nickname — whatever feels right.",
-    type: "text",
+    field: 'preferred_name',
+    title: 'First things first.',
+    subtitle: 'What should Sol call you?',
+    type: 'text',
+    placeholder: 'Your name or nickname...',
+    optional: false,
   },
   {
     id: 'q1',
-    title: "When life gets hard, what do you usually do first?",
-    subtext: "There's no right answer — just your honest instinct.",
-    type: "select",
+    title: 'When life gets hard, what do you usually do first?',
+    subtitle: "There's no right answer — just your honest instinct.",
+    type: 'single',
     options: [
-      { text: "I try to figure it out alone", value: "alone" },
-      { text: "I talk to someone I trust", value: "talk" },
-      { text: "I distract myself until it passes", value: "distract" },
-      { text: "I feel overwhelmed and freeze", value: "freeze" }
-    ]
+      { label: 'I try to figure it out alone', value: 'solo', maps: { coping_style: 'avoidant', attachment_hint: 'avoidant' } },
+      { label: 'I talk to someone I trust', value: 'social', maps: { coping_style: 'social', attachment_hint: 'secure' } },
+      { label: 'I distract myself until it passes', value: 'distract', maps: { coping_style: 'avoidant' } },
+      { label: 'I feel overwhelmed and freeze', value: 'freeze', maps: { coping_style: 'freeze', attachment_hint: 'anxious' } },
+    ],
   },
   {
     id: 'q2',
-    title: "How often do you feel like your emotions are too big for the moment?",
-    subtext: "Like when a small thing hits much harder than it should.",
-    type: "slider",
+    title: 'How often do you feel like your emotions are too big for the moment?',
+    subtitle: 'Like when a small thing hits much harder than it should.',
+    type: 'slider',
+    min: 1,
+    max: 5,
+    minLabel: 'Rarely',
+    maxLabel: 'Almost always',
+    maps: 'neuroticism_score',
   },
   {
     id: 'q3',
-    title: "In close relationships, what worries you most?",
-    subtext: "This could be friendships, family, or romantic relationships.",
-    type: "select",
+    title: 'In close relationships, what worries you most?',
+    subtitle: 'This could be friendships, family, or romantic relationships.',
+    type: 'single',
     options: [
-      { text: "That I'll be abandoned or left out", value: "abandoned" },
-      { text: "That I'll lose my independence", value: "independence" },
-      { text: "That I'll say the wrong thing and hurt them", value: "hurt" },
-      { text: "Not much — I feel pretty secure", value: "secure" }
-    ]
+      { label: "I'll be abandoned or left out", value: 'abandonment', maps: { attachment_hint: 'anxious' } },
+      { label: "I'll lose my independence", value: 'independence', maps: { attachment_hint: 'avoidant' } },
+      { label: "I'll say the wrong thing and hurt them", value: 'hurting', maps: { attachment_hint: 'anxious' } },
+      { label: "Not much — I feel pretty secure", value: 'secure', maps: { attachment_hint: 'secure' } },
+    ],
   },
   {
     id: 'q4',
-    title: "When you have a goal, how do you usually approach it?",
-    subtext: "Think of something you genuinely cared about achieving.",
-    type: "select",
+    title: 'When you have a goal, how do you usually approach it?',
+    subtitle: 'Think of something you genuinely cared about achieving.',
+    type: 'single',
     options: [
-      { text: "I make a plan and stick to it", value: "plan" },
-      { text: "I start strong but lose momentum", value: "lose_momentum" },
-      { text: "I work in bursts when I'm inspired", value: "bursts" },
-      { text: "I struggle to start, even when I want to", value: "struggle_start" }
-    ]
+      { label: 'I make a plan and stick to it', value: 'planned', maps: { conscientiousness: 'high' } },
+      { label: 'I start strong but lose momentum', value: 'loses_momentum', maps: { conscientiousness: 'low' } },
+      { label: 'I work in bursts when inspired', value: 'bursts', maps: { conscientiousness: 'low', openness: 'high' } },
+      { label: 'I struggle to start even when I want to', value: 'struggles', maps: { conscientiousness: 'low', neuroticism_hint: 'high' } },
+    ],
   },
   {
     id: 'q5',
-    title: "Finish this sentence honestly: Deep down, I believe I am...",
-    subtext: "The first thing that comes to mind is usually the truest.",
-    type: "select",
+    title: 'Finish this sentence honestly: Deep down, I believe I am...',
+    subtitle: 'The first thing that comes to mind is usually the truest.',
+    type: 'single',
     options: [
-      { text: "Capable and worthy of good things", value: "capable" },
-      { text: "Trying my best, but often falling short", value: "falling_short" },
-      { text: "A burden to the people around me", value: "burden" },
-      { text: "Honestly not sure — it changes a lot", value: "unsure" }
-    ]
+      { label: 'Capable and worthy of good things', value: 'positive', maps: { core_belief_valence: 'positive' } },
+      { label: 'Trying my best, but often falling short', value: 'mild_negative', maps: { core_belief_valence: 'mild_negative' } },
+      { label: 'A burden to the people around me', value: 'burden', maps: { core_belief_valence: 'negative', flag_needs_care: true } },
+      { label: 'Honestly not sure — it changes a lot', value: 'unstable', maps: { core_belief_valence: 'unstable' } },
+    ],
   },
   {
     id: 'q6',
-    title: "After a long social day, what does your body ask for?",
-    subtext: "Not what you think you should want — what you actually crave.",
-    type: "select",
+    title: 'After a long social day, what does your body ask for?',
+    subtitle: 'Not what you think you should want — what you actually crave.',
+    type: 'single',
     options: [
-      { text: "More people — energy comes from connection", value: "more_people" },
-      { text: "Quiet alone time to recharge", value: "alone_time" },
-      { text: "One good conversation, then silence", value: "one_conversation" },
-      { text: "It depends entirely on my mood", value: "depends" }
-    ]
+      { label: 'More people — energy comes from connection', value: 'extrovert', maps: { extraversion: 'high' } },
+      { label: 'Quiet alone time to recharge', value: 'introvert', maps: { extraversion: 'low' } },
+      { label: 'One good conversation, then silence', value: 'ambivert', maps: { extraversion: 'mixed' } },
+      { label: 'It depends entirely on my mood', value: 'variable', maps: { extraversion: 'mixed' } },
+    ],
   },
   {
     id: 'q7',
     title: "What's the area of your life that weighs on you most right now?",
-    subtext: "This helps Sol know where to show up for you.",
-    type: "multiselect",
+    subtitle: 'This helps Sol know where to show up for you.',
+    type: 'multi',
+    max: 2,
     options: [
-      "Academics", "Family", "Friendships", "Romantic relationships", 
-      "Self-image", "Future & career", "Loneliness", "Mental health", 
-      "Finances", "Something else"
-    ]
+      'Academics', 'Family', 'Friendships', 'Romantic relationships',
+      'Self-image', 'Future & career', 'Loneliness', 'Mental health',
+      'Finances', 'Something else',
+    ],
   },
   {
     id: 'q8',
     title: "When you're really struggling, how do people around you know?",
-    subtext: "Or do they not know at all?",
-    type: "select",
+    subtitle: 'Or do they not know at all?',
+    type: 'single',
     options: [
-      { text: "I talk about it openly", value: "openly" },
-      { text: "They can tell from my behaviour", value: "behaviour" },
-      { text: "I hide it well — most people don't know", value: "hide" },
-      { text: "I isolate and go quiet", value: "isolate" }
-    ]
+      { label: 'I talk about it openly', value: 'open', maps: { emotional_expression_style: 'open' } },
+      { label: 'They can tell from my behaviour', value: 'behaviour', maps: { emotional_expression_style: 'somatic' } },
+      { label: "I hide it well — most people don't know", value: 'hidden', maps: { emotional_expression_style: 'masked' } },
+      { label: 'I isolate and go quiet', value: 'isolate', maps: { emotional_expression_style: 'withdrawal' } },
+    ],
   },
   {
     id: 'q9',
-    title: "What would you most want from Sol?",
-    subtext: "How can this space be most useful to you?",
-    type: "select",
+    title: 'What would you most want from Sol?',
+    subtitle: 'How can this space be most useful to you?',
+    type: 'single',
     options: [
-      { text: "Help me understand why I feel what I feel", value: "insight" },
-      { text: "Give me tools and strategies to cope", value: "cbt" },
-      { text: "Just listen — I need to feel heard", value: "listen" },
-      { text: "Push me to take action and grow", value: "action" }
-    ]
+      { label: 'Help me understand why I feel what I feel', value: 'insight_oriented', maps: { therapy_style_preference: 'insight_oriented' } },
+      { label: 'Give me tools and strategies to cope', value: 'CBT_oriented', maps: { therapy_style_preference: 'CBT_oriented' } },
+      { label: 'Just listen — I need to feel heard', value: 'person_centered', maps: { therapy_style_preference: 'person_centered' } },
+      { label: 'Push me to take action and grow', value: 'coaching_oriented', maps: { therapy_style_preference: 'coaching_oriented' } },
+    ],
   },
   {
     id: 'q10',
-    title: "Is there anything about you that you wish people understood better?",
-    subtext: "You don't have to answer this. But if something comes to mind, Sol is listening.",
-    type: "textarea",
+    title: 'Is there anything about you that you wish people understood better?',
+    subtitle: "You don't have to answer this. But if something comes to mind, Sol is listening.",
+    type: 'text',
+    placeholder: 'Take your time...',
+    optional: true,
+  },
+]
+
+function computePersonalityProfile(answers) {
+  const profile = {
+    attachment_style: 'mixed',
+    neuroticism_score: 3,
+    extraversion: 'mixed',
+    conscientiousness: 'mixed',
+    core_belief_valence: 'positive',
+    therapy_style_preference: 'person_centered',
+    primary_stressor_domains: [],
+    emotional_expression_style: 'open',
+    coping_style: 'approach',
+    free_text_reflection: null,
+    flag_needs_care: false,
   }
-];
+
+  // Q0 — name (handled separately, not in profile)
+
+  // Q1 — coping style
+  const q1 = answers.q1
+  if (q1 === 'solo' || q1 === 'distract') profile.coping_style = 'avoidant'
+  else if (q1 === 'social') profile.coping_style = 'social'
+  else if (q1 === 'freeze') profile.coping_style = 'freeze'
+
+  // Q2 — neuroticism
+  if (answers.q2) profile.neuroticism_score = parseInt(answers.q2)
+
+  // Q3 + Q1 — attachment style
+  const q3 = answers.q3
+  const attachmentHints = []
+  if (q1 === 'solo' || q1 === 'distract') attachmentHints.push('avoidant')
+  if (q1 === 'social') attachmentHints.push('secure')
+  if (q1 === 'freeze') attachmentHints.push('anxious')
+  if (q3 === 'abandonment' || q3 === 'hurting') attachmentHints.push('anxious')
+  if (q3 === 'independence') attachmentHints.push('avoidant')
+  if (q3 === 'secure') attachmentHints.push('secure')
+
+  const counts = attachmentHints.reduce((acc, h) => {
+    acc[h] = (acc[h] || 0) + 1
+    return acc
+  }, {})
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+  profile.attachment_style = sorted[0]?.[0] || 'mixed'
+
+  // Q4 — conscientiousness
+  const q4 = answers.q4
+  if (q4 === 'planned') profile.conscientiousness = 'high'
+  else if (q4 === 'loses_momentum' || q4 === 'struggles') profile.conscientiousness = 'low'
+  else profile.conscientiousness = 'mixed'
+
+  // Q5 — core belief
+  const q5 = answers.q5
+  if (q5) {
+    const option = QUESTIONS[5].options.find(o => o.value === q5)
+    if (option?.maps?.core_belief_valence)
+      profile.core_belief_valence = option.maps.core_belief_valence
+    if (option?.maps?.flag_needs_care)
+      profile.flag_needs_care = true
+  }
+
+  // Q6 — extraversion
+  const q6 = answers.q6
+  if (q6 === 'extrovert') profile.extraversion = 'high'
+  else if (q6 === 'introvert') profile.extraversion = 'low'
+  else profile.extraversion = 'mixed'
+
+  // Q7 — stressors
+  if (Array.isArray(answers.q7)) {
+    profile.primary_stressor_domains = answers.q7.map(s => s.toLowerCase().replace(/ /g, '_'))
+  }
+
+  // Q8 — emotional expression
+  const q8 = answers.q8
+  if (q8) {
+    const option = QUESTIONS[8].options.find(o => o.value === q8)
+    if (option?.maps?.emotional_expression_style)
+      profile.emotional_expression_style = option.maps.emotional_expression_style
+  }
+
+  // Q9 — therapy style
+  const q9 = answers.q9
+  if (q9) profile.therapy_style_preference = q9
+
+  // Q10 — free text
+  if (answers.q10?.trim()) profile.free_text_reflection = answers.q10.trim()
+
+  return profile
+}
 
 export default function Onboarding() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [direction, setDirection] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const navigate = useNavigate();
-  const { setProfile } = useAuth(); // Import from Auth context
+  const navigate = useNavigate()
+  const { user, refreshProfile } = useAuth()
+  const [step, setStep] = useState(0)
+  const [answers, setAnswers] = useState({})
+  const [direction, setDirection] = useState(1)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
-  const handleNext = async () => {
-    if (currentStep < questions.length - 1) {
-      setDirection(1);
-      setCurrentStep(prev => prev + 1);
-    } else {
-      await submitProfile();
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setDirection(-1);
-      setCurrentStep(prev => prev - 1);
-    }
-  };
-
-  const computeProfile = () => {
-    let attachment_style = 'secure';
-    const q1 = answers.q1;
-    const q3 = answers.q3;
-    if (q3 === 'abandoned' || q1 === 'freeze') attachment_style = 'anxious';
-    if (q3 === 'independence' || q1 === 'alone' || q1 === 'distract') attachment_style = 'avoidant';
-    if (q3 === 'hurt') attachment_style = 'mixed';
-    if (q3 === 'secure' && q1 === 'talk') attachment_style = 'secure';
-
-    let neuroticism_score = answers.q2 || 3;
-
-    let extraversion = 'mixed';
-    const q6 = answers.q6;
-    if (q6 === 'more_people') extraversion = 'high';
-    if (q6 === 'alone_time') extraversion = 'low';
-
-    let conscientiousness = 'mixed';
-    const q4 = answers.q4;
-    if (q4 === 'plan') conscientiousness = 'high';
-    if (q4 === 'struggle_start' || q4 === 'lose_momentum') conscientiousness = 'low';
-
-    let core_belief_valence = 'unstable';
-    const q5 = answers.q5;
-    if (q5 === 'capable') core_belief_valence = 'positive';
-    if (q5 === 'falling_short') core_belief_valence = 'mild_negative';
-    if (q5 === 'burden') core_belief_valence = 'negative';
-
-    let therapy_style_preference = 'person_centered';
-    const q9 = answers.q9;
-    if (q9 === 'insight') therapy_style_preference = 'insight_oriented';
-    if (q9 === 'cbt') therapy_style_preference = 'CBT_oriented';
-    if (q9 === 'action') therapy_style_preference = 'coaching_oriented';
-
-    let emotional_expression_style = 'masked';
-    const q8 = answers.q8;
-    if (q8 === 'openly') emotional_expression_style = 'open';
-    if (q8 === 'behaviour') emotional_expression_style = 'somatic';
-    if (q8 === 'isolate') emotional_expression_style = 'withdrawal';
-
-    let coping_style = 'avoidant';
-    if (q1 === 'talk') coping_style = 'social';
-    if (q1 === 'alone') coping_style = 'approach';
-    if (q1 === 'freeze') coping_style = 'freeze';
-
-    return {
-      attachment_style,
-      neuroticism_score: parseInt(neuroticism_score, 10),
-      extraversion,
-      conscientiousness,
-      core_belief_valence,
-      therapy_style_preference,
-      primary_stressor_domains: answers.q7 || [],
-      emotional_expression_style,
-      coping_style,
-      free_text_reflection: answers.q10 || null,
-      flag_needs_care: q5 === 'burden',
-    };
-  };
-
-  const submitProfile = async () => {
-    setIsSubmitting(true);
-    try {
-      const profile = computeProfile();
-      const payload = {
-        responses: answers,
-        personality_profile: profile
-      };
-
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Update preferred_name on profile table directly as well
-      if (answers.q0) {
-        await api.patch('/api/profile/update', { preferred_name: answers.q0 }, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-      }
-
-      await api.post('/api/profile/intake', payload, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-      
-      // Crucial: Update Auth state so we don't get routed right back
-      setProfile(prev => ({ ...prev, onboarding_completed: true, preferred_name: answers.q0 || prev?.preferred_name }));
-      setIsDone(true);
-    } catch (error) {
-      console.error(error);
-      setIsSubmitting(false);
-    }
-  };
+  const question = QUESTIONS[step]
+  const isLastStep = step === TOTAL_QUESTIONS - 1
 
   const canContinue = () => {
-    const q = questions[currentStep];
-    if (q.type === 'slider') return !!answers[q.id];
-    if (q.type === 'textarea') return true; // Optional
-    if (q.type === 'text') return !!answers[q.id] && answers[q.id].trim() !== '';
-    if (q.type === 'multiselect') return answers[q.id] && answers[q.id].length > 0;
-    return !!answers[q.id];
-  };
-
-  if (isDone) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-sol-bg relative overflow-hidden">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], opacity: [0, 0.2, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute w-[500px] h-[500px] bg-sol-primary/30 rounded-full blur-3xl"
-        />
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1 }}
-          className="text-center z-10 max-w-xl px-4"
-        >
-          <div className="font-display italic text-6xl text-sol-primary mb-8">Sol</div>
-          <h1 className="text-3xl font-display text-sol-text-primary mb-4">You just did something brave.</h1>
-          <p className="text-xl text-sol-text-secondary mb-12">
-            Sol has listened carefully. Every session from here will be shaped around you.
-          </p>
-          <button onClick={() => navigate('/dashboard')} className="btn-primary flex items-center gap-2 mx-auto px-8 py-3 text-lg">
-            Enter Sol <span className="font-sans">&rarr;</span>
-          </button>
-        </motion.div>
-      </div>
-    );
+    const q = QUESTIONS[step]
+    if (q.optional) return true
+    const answer = answers[q.id]
+    if (q.type === 'text') return !!answer?.trim()
+    if (q.type === 'single') return !!answer
+    if (q.type === 'slider') return answer !== undefined
+    if (q.type === 'multi') return Array.isArray(answer) && answer.length > 0
+    return false
   }
 
-  const currentQ = questions[currentStep];
+  const handleNext = async () => {
+    if (!canContinue() && !QUESTIONS[step].optional) return
+
+    if (isLastStep) {
+      await handleSubmit()
+      return
+    }
+
+    setDirection(1)
+    setStep(s => s + 1)
+  }
+
+  const handleBack = () => {
+    if (step === 0) return
+    setDirection(-1)
+    setStep(s => s - 1)
+  }
+
+  const handleAnswer = (value) => {
+    setAnswers(prev => ({ ...prev, [question.id]: value }))
+  }
+
+  const handleMultiToggle = (option) => {
+    const current = answers[question.id] || []
+    const max = question.max || 99
+    if (current.includes(option)) {
+      handleAnswer(current.filter(o => o !== option))
+    } else if (current.length < max) {
+      handleAnswer([...current, option])
+    }
+  }
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const personalityProfile = computePersonalityProfile(answers)
+      const preferredName = answers.q0?.trim() || ''
+
+      // Save intake responses
+      await api.post('/api/profile/intake', {
+        responses: answers,
+        personality_profile: personalityProfile,
+      })
+
+      // Save preferred name to profile
+      if (preferredName) {
+        await api.patch('/api/profile/update', {
+          preferred_name: preferredName,
+        })
+      }
+
+      // Refresh profile in AuthContext so OnboardingGuard sees
+      // onboarding_completed = true and stops redirecting
+      await refreshProfile()
+
+      // Navigate to dashboard
+      navigate('/dashboard', { replace: true })
+
+    } catch (err) {
+      console.error('[Onboarding] Submit failed:', err)
+      setError(err.response?.data?.message || 'Something went wrong. Please try again.')
+      setSubmitting(false)
+    }
+  }
+
+  const slideVariants = {
+    enter: (dir) => ({ opacity: 0, x: dir > 0 ? 40 : -40 }),
+    center: { opacity: 1, x: 0 },
+    exit: (dir) => ({ opacity: 0, x: dir > 0 ? -40 : 40 }),
+  }
 
   return (
-    <div className="h-screen flex flex-col bg-sol-bg overflow-hidden">
-      <nav className="h-20 flex items-center px-8 flex-none justify-between">
-         <div className="font-display italic text-2xl text-sol-primary">Sol</div>
-         {currentStep > 0 && (
-            <button onClick={handleBack} className="text-sol-text-secondary hover:text-sol-text-primary transition-colors">
-              Back
-            </button>
-         )}
-      </nav>
-      
-      <div className="w-full bg-sol-border h-1 flex-none">
-        <motion.div 
-          className="bg-sol-primary h-full"
-          initial={{ width: 0 }}
-          animate={{ width: `${((currentStep) / questions.length) * 100}%` }}
-          transition={{ duration: 0.3 }}
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--mesh-home)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+      fontFamily: 'DM Sans, sans-serif',
+    }}>
+      {/* Logo */}
+      <div style={{
+        position: 'fixed',
+        top: 24,
+        left: 32,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}>
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: '#C96B2E',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontFamily: 'Fraunces, serif',
+          fontStyle: 'italic',
+          fontSize: 13,
+        }}>S</div>
+        <span style={{
+          fontFamily: 'Fraunces, serif',
+          fontStyle: 'italic',
+          fontSize: 18,
+          color: '#1A1714',
+          fontWeight: 300,
+        }}>Sol</span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        background: '#F0EBE5',
+        zIndex: 100,
+      }}>
+        <motion.div
+          style={{
+            height: '100%',
+            background: '#C96B2E',
+            borderRadius: '0 2px 2px 0',
+          }}
+          animate={{ width: `${((step + 1) / TOTAL_QUESTIONS) * 100}%` }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
         />
       </div>
 
-      <main className="flex-1 flex items-center justify-center p-4 min-h-0 relative">
+      {/* Step counter */}
+      <div style={{
+        position: 'fixed',
+        top: 20,
+        right: 32,
+        fontSize: 13,
+        color: '#9E8E7E',
+        fontFamily: 'DM Sans, sans-serif',
+      }}>
+        {step + 1} / {TOTAL_QUESTIONS}
+      </div>
+
+      {/* Question card */}
+      <div style={{
+        width: '100%',
+        maxWidth: 520,
+        position: 'relative',
+        minHeight: 360,
+      }}>
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
-            key={currentStep}
+            key={step}
             custom={direction}
-            initial={{ opacity: 0, x: direction * 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction * -50 }}
-            transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="w-full max-w-2xl px-4 flex flex-col items-center"
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            style={{ width: '100%' }}
           >
-            <div className="text-center mb-10">
-              <span className="inline-block text-sol-primary-light bg-sol-primary px-3 py-1 rounded-full text-sm font-medium mb-6">
-                Question {currentStep + 1} of 11
-              </span>
-              <h2 className="text-3xl md:text-4xl text-sol-text-primary mb-4 leading-tight">
-                {currentQ.title}
-              </h2>
-              <p className="text-sol-text-secondary text-lg">
-                {currentQ.subtext}
-              </p>
+            {/* Question text */}
+            <div style={{ marginBottom: 32, textAlign: 'center' }}>
+              <h2 style={{
+                fontFamily: 'Fraunces, serif',
+                fontSize: 'clamp(22px, 4vw, 30px)',
+                fontWeight: 300,
+                color: '#1A1714',
+                margin: '0 0 10px',
+                lineHeight: 1.25,
+              }}>{question.title}</h2>
+              {question.subtitle && (
+                <p style={{
+                  fontSize: 15,
+                  color: '#9E8E7E',
+                  margin: 0,
+                  lineHeight: 1.55,
+                }}>{question.subtitle}</p>
+              )}
             </div>
 
-            <div className="w-full max-w-lg mb-12">
-              {currentQ.type === 'text' && (
-                <input
-                  type="text"
-                  value={answers[currentQ.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [currentQ.id]: e.target.value })}
-                  placeholder="e.g. Sam..."
-                  className="sol-input text-lg text-center font-medium"
-                  autoFocus
-                />
-              )}
+            {/* TEXT input */}
+            {question.type === 'text' && (
+              <div style={{ marginBottom: 24 }}>
+                {question.id === 'q10' ? (
+                  <textarea
+                    value={answers[question.id] || ''}
+                    onChange={e => handleAnswer(e.target.value)}
+                    placeholder={question.placeholder}
+                    rows={4}
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      borderRadius: 16,
+                      border: '1.5px solid #E8E3DD',
+                      background: 'rgba(255,252,248,0.8)',
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 15,
+                      color: '#1A1714',
+                      outline: 'none',
+                      resize: 'none',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 150ms',
+                    }}
+                    onFocus={e => e.target.style.borderColor = '#C96B2E'}
+                    onBlur={e => e.target.style.borderColor = '#E8E3DD'}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={answers[question.id] || ''}
+                    onChange={e => handleAnswer(e.target.value)}
+                    placeholder={question.placeholder}
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && handleNext()}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      borderRadius: 16,
+                      border: '1.5px solid #E8E3DD',
+                      background: 'rgba(255,252,248,0.8)',
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontSize: 16,
+                      color: '#1A1714',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 150ms',
+                    }}
+                    onFocus={e => e.target.style.borderColor = '#C96B2E'}
+                    onBlur={e => e.target.style.borderColor = '#E8E3DD'}
+                  />
+                )}
+              </div>
+            )}
 
-              {currentQ.type === 'select' && (
-                <div className="flex flex-col space-y-4">
-                  {currentQ.options.map((opt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setAnswers({ ...answers, [currentQ.id]: opt.value })}
-                      className={`text-left p-5 rounded-2xl border transition-all duration-200 ${
-                        answers[currentQ.id] === opt.value 
-                        ? 'border-sol-primary bg-sol-primary-light scale-[1.02] shadow-sm' 
-                        : 'border-sol-border bg-sol-surface hover:border-sol-text-secondary'
-                      }`}
+            {/* SINGLE SELECT */}
+            {question.type === 'single' && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                marginBottom: 24,
+              }}>
+                {question.options.map(opt => {
+                  const isSelected = answers[question.id] === opt.value
+                  return (
+                    <motion.button
+                      key={opt.value}
+                      onClick={() => handleAnswer(opt.value)}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      style={{
+                        padding: '16px 20px',
+                        borderRadius: 16,
+                        border: `2px solid ${isSelected ? '#C96B2E' : '#E8E3DD'}`,
+                        background: isSelected
+                          ? 'rgba(201,107,46,0.08)'
+                          : 'rgba(255,252,248,0.8)',
+                        backdropFilter: 'blur(12px)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 15,
+                        color: isSelected ? '#C96B2E' : '#1A1714',
+                        fontWeight: isSelected ? 500 : 400,
+                        transition: 'all 150ms ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
                     >
-                      {opt.text}
-                    </button>
+                      {opt.label}
+                      {isSelected && (
+                        <span style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: '#C96B2E',
+                          color: 'white',
+                          fontSize: 11,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>✓</span>
+                      )}
+                    </motion.button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* SLIDER */}
+            {question.type === 'slider' && (
+              <div style={{ marginBottom: 32, padding: '0 8px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 32,
+                }}>
+                  {[1,2,3,4,5].map(val => (
+                    <motion.button
+                      key={val}
+                      onClick={() => handleAnswer(val)}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: '50%',
+                        border: `2px solid ${answers[question.id] === val
+                          ? '#C96B2E' : '#E8E3DD'}`,
+                        background: answers[question.id] === val
+                          ? '#C96B2E' : 'rgba(255,252,248,0.8)',
+                        color: answers[question.id] === val
+                          ? 'white' : '#6B6560',
+                        fontFamily: 'Fraunces, serif',
+                        fontSize: 20,
+                        fontWeight: 300,
+                        cursor: 'pointer',
+                        transition: 'all 150ms',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >{val}</motion.button>
                   ))}
                 </div>
-              )}
-
-              {currentQ.type === 'slider' && (
-                <div className="flex flex-col items-center pt-8">
-                  <input
-                    type="range"
-                    min="1"
-                    max="5"
-                    step="1"
-                    value={answers[currentQ.id] || 3}
-                    onChange={(e) => setAnswers({ ...answers, [currentQ.id]: e.target.value })}
-                    className="w-full h-2 bg-sol-border rounded-lg appearance-none cursor-pointer accent-sol-primary outline-none"
-                  />
-                  <div className="w-full flex justify-between mt-4 text-sol-text-secondary text-sm">
-                    <span>Rarely</span>
-                    <span>Almost always</span>
-                  </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 13,
+                  color: '#9E8E7E',
+                }}>
+                  <span>{question.minLabel}</span>
+                  <span>{question.maxLabel}</span>
                 </div>
-              )}
+              </div>
+            )}
 
-              {currentQ.type === 'multiselect' && (
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {currentQ.options.map((opt, i) => {
-                    const isSelected = answers[currentQ.id]?.includes(opt);
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          const currentSelections = answers[currentQ.id] || [];
-                          if (isSelected) {
-                            setAnswers({ ...answers, [currentQ.id]: currentSelections.filter(c => c !== opt) });
-                          } else if (currentSelections.length < 2) {
-                            setAnswers({ ...answers, [currentQ.id]: [...currentSelections, opt] });
-                          }
-                        }}
-                        className={`px-5 py-3 rounded-2xl border transition-all duration-200 ${
-                          isSelected 
-                          ? 'border-sol-primary bg-sol-primary-light shadow-sm' 
-                          : 'border-sol-border bg-sol-surface hover:border-sol-text-secondary'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                  <p className="w-full text-center text-sm text-sol-text-secondary mt-4">Select up to 2</p>
-                </div>
-              )}
+            {/* MULTI SELECT */}
+            {question.type === 'multi' && (
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+                marginBottom: 24,
+                justifyContent: 'center',
+              }}>
+                {question.options.map(opt => {
+                  const selected = (answers[question.id] || []).includes(opt)
+                  return (
+                    <motion.button
+                      key={opt}
+                      onClick={() => handleMultiToggle(opt)}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: 999,
+                        border: `2px solid ${selected ? '#C96B2E' : '#E8E3DD'}`,
+                        background: selected
+                          ? 'rgba(201,107,46,0.08)' : 'rgba(255,252,248,0.8)',
+                        color: selected ? '#C96B2E' : '#6B6560',
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontSize: 14,
+                        fontWeight: selected ? 500 : 400,
+                        cursor: 'pointer',
+                        transition: 'all 150ms',
+                      }}
+                    >{opt}</motion.button>
+                  )
+                })}
+                <p style={{
+                  width: '100%',
+                  textAlign: 'center',
+                  fontSize: 12,
+                  color: '#9E8E7E',
+                  margin: '4px 0 0',
+                }}>Pick up to {question.max}</p>
+              </div>
+            )}
 
-              {currentQ.type === 'textarea' && (
-                <textarea
-                  value={answers[currentQ.id] || ''}
-                  onChange={(e) => setAnswers({ ...answers, [currentQ.id]: e.target.value })}
-                  placeholder="Take your time..."
-                  className="w-full h-40 rounded-2xl border border-sol-border p-5 bg-sol-surface focus:outline-none focus:border-sol-primary transition-colors resize-none mb-2"
-                />
-              )}
-            </div>
+            {/* Error */}
+            {error && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'rgba(192,57,43,0.08)',
+                border: '1px solid rgba(192,57,43,0.2)',
+                fontSize: 13,
+                color: '#C0392B',
+                marginBottom: 16,
+                textAlign: 'center',
+              }}>{error}</div>
+            )}
 
-            <div className="h-16 flex items-center justify-center">
-              <AnimatePresence>
-                {canContinue() && (
-                  <motion.button
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    onClick={handleNext}
-                    disabled={isSubmitting}
-                    className="btn-primary px-10 py-3 text-lg"
-                  >
-                    {isSubmitting ? 'Saving...' : 'Continue'}
-                  </motion.button>
-                )}
-              </AnimatePresence>
+            {/* Navigation buttons */}
+            <div style={{
+              display: 'flex',
+              gap: 10,
+              marginTop: 8,
+            }}>
+              {step > 0 && (
+                <button
+                  onClick={handleBack}
+                  style={{
+                    padding: '14px 20px',
+                    borderRadius: 999,
+                    border: '1px solid #E8E3DD',
+                    background: 'transparent',
+                    color: '#9E8E7E',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    transition: 'all 150ms',
+                  }}
+                >← Back</button>
+              )}
+              <button
+                onClick={handleNext}
+                disabled={!canContinue() && !question.optional || submitting}
+                className="btn-mesh"
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  fontSize: 15,
+                  opacity: (!canContinue() && !question.optional) ? 0.45 : 1,
+                }}
+              >
+                {submitting
+                  ? 'Saving...'
+                  : isLastStep
+                    ? 'Enter Sol →'
+                    : question.optional && !answers[question.id]?.trim()
+                      ? 'Skip →'
+                      : 'Continue →'}
+              </button>
             </div>
           </motion.div>
         </AnimatePresence>
-      </main>
+      </div>
     </div>
-  );
+  )
 }

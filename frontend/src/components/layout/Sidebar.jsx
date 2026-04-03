@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Home, Clock, Brain, Settings } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { api } from '../../lib/axios'
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Home', icon: Home },
@@ -12,6 +14,27 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  
+  const [isPro, setIsPro] = useState(true) // default true to avoid flash
+  const cacheRef = useRef({ data: null, timestamp: 0 })
+
+  useEffect(() => {
+    const fetchBillingStatus = async () => {
+      const now = Date.now()
+      if (cacheRef.current.data && now - cacheRef.current.timestamp < 60000) {
+        setIsPro(cacheRef.current.data.is_pro)
+        return
+      }
+      try {
+        const res = await api.get('/api/billing/status')
+        cacheRef.current = { data: res.data, timestamp: now }
+        setIsPro(res.data.is_pro)
+      } catch (e) {
+        setIsPro(true)
+      }
+    }
+    fetchBillingStatus()
+  }, [])
 
   const initials = user?.email?.[0]?.toUpperCase() || 'U'
   const displayName = user?.user_metadata?.preferred_name
@@ -106,6 +129,73 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Upgrade or Pro badge */}
+      {!isPro && (
+        <div style={{
+          margin: '8px 12px 16px',
+          padding: '16px',
+          borderRadius: 14,
+          background: 'rgba(201,107,46,0.06)',
+          border: '1px solid rgba(201,107,46,0.15)',
+        }}>
+          <div style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#C96B2E',
+            fontFamily: 'DM Sans, sans-serif',
+            marginBottom: 4,
+          }}>✦ Sol Pro</div>
+          <div style={{
+            fontSize: 12,
+            color: '#6B6560',
+            fontFamily: 'DM Sans, sans-serif',
+            lineHeight: 1.5,
+            marginBottom: 12,
+          }}>
+            Unlimited sessions,<br />full memory, no limits.
+          </div>
+          <NavLink
+            to="/upgrade"
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              padding: '8px 12px',
+              borderRadius: 999,
+              background: '#C96B2E',
+              color: 'white',
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: 12,
+              fontWeight: 500,
+              textDecoration: 'none',
+              transition: 'filter 150ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
+            onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
+          >
+            Upgrade — $9/mo
+          </NavLink>
+        </div>
+      )}
+
+      {isPro && (
+        <div style={{
+          margin: '8px 12px 16px',
+          padding: '10px 14px',
+          borderRadius: 12,
+          background: 'rgba(61,122,95,0.06)',
+          border: '1px solid rgba(61,122,95,0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <span style={{ color: '#3D7A5F', fontSize: 14 }}>✦</span>
+          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 12,
+                        color: '#3D7A5F', fontWeight: 500 }}>
+            Sol Pro · Active
+          </span>
+        </div>
+      )}
 
       {/* Bottom: profile + sign out */}
       <div style={{ padding: '16px 16px 0', borderTop: '1px solid #E8E3DD' }}>

@@ -9,6 +9,9 @@ import Session from './pages/Session';
 import NewSession from './pages/NewSession';
 
 import Settings from './pages/Settings';
+import Upgrade from './pages/Upgrade';
+import UpgradePage from './pages/UpgradePage';
+import Admin from './pages/Admin';
 import Sessions from './pages/Sessions';
 import Memory from './pages/Memory';
 import Profile from './pages/Profile';
@@ -46,6 +49,15 @@ function App() {
               <ProtectedRoute>
                 <OnboardingGuard>
                   <ErrorBoundary><Dashboard /></ErrorBoundary>
+                </OnboardingGuard>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/paywall" element={<Upgrade />} />
+            <Route path="/upgrade" element={
+              <ProtectedRoute>
+                <OnboardingGuard>
+                  <UpgradePage />
                 </OnboardingGuard>
               </ProtectedRoute>
             } />

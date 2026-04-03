@@ -11,8 +11,15 @@ def build_system_prompt(context: dict) -> str:
     if not isinstance(settings, dict):
         settings = {}
         
-    therapist_name = settings.get("therapist_name", "Sol")
+    TONE_TO_NAME = {
+      "Like a warm friend": "Riley",
+      "Like a thoughtful guide": "Sage",
+      "Like a coach": "Alex",
+      "Like a wise mentor": "Aura",
+    }
+        
     therapist_tone = settings.get("therapist_tone", "Like a warm friend")
+    therapist_name = TONE_TO_NAME.get(therapist_tone, settings.get("therapist_name", "Sol"))
     therapist_focus = settings.get("therapist_focus", ["Emotional support"])
     response_length = settings.get("response_length", "Balanced")
     preferred_language = settings.get("preferred_language", "English")
@@ -36,8 +43,12 @@ def build_system_prompt(context: dict) -> str:
     flag_needs_care = profile.get("flag_needs_care", False)
 
     # Context formatting
+    def format_relationship(note: str) -> str:
+        cleaned = note.replace("[Relationship] ", "").strip()
+        return f"- {cleaned}"
+
     notes_str = "\n".join([f"- {note}" for note in notes]) if notes else "Early sessions — no memory notes yet. Pay attention and build context."
-    rel_str = "\n".join([f"- {r}" for r in relationships]) if relationships else "No relationship context yet — build it naturally through conversation."
+    rel_str = "\n".join([format_relationship(r) for r in relationships]) if relationships else "No relationship context yet — learn about the people in their life naturally."
     summaries_str = "\n\n".join(summaries) if summaries else "This is their first session."
     
     mood_before = sess_meta.get("mood_before", "unknown")
@@ -125,6 +136,33 @@ If the user expresses suicidal ideation, self-harm, or severe hopelessness:
    Vandrevala Foundation: 1860-2662-345 (24/7)
    iCharity Kerala: 0484-2361161
 5. Stay in the conversation — do not abandon them after giving resources
+
+━━━ FEEDBACK DETECTION ━━━
+
+If the user says something negative about Sol — like "your messages are
+too long", "you're not helping", "this is useless", "you don't understand
+me", "ur responses suck" — do ALL of these:
+
+1. Acknowledge it genuinely and briefly. No defensiveness.
+   Example: "That's fair — I hear you."
+
+2. Ask one specific follow-up to understand better:
+   Example: "What would feel more helpful right now?"
+
+3. Add this EXACT tag at the very end of your response, hidden from
+   display but parseable:
+   [FEEDBACK::<category>::<sentiment>::<quote>]
+
+   Where:
+   category = message_length | tone | relevance | accuracy | other
+   sentiment = negative | mixed | suggestion
+   quote = the exact thing the user said (max 100 chars)
+
+   Example:
+   [FEEDBACK::message_length::negative::ur messages are too long]
+
+This tag will be stripped before displaying to the user.
+Never mention this process to the user.
 
 ━━━ WHAT MAKES A GREAT SESSION ━━━
 

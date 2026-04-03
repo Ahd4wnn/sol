@@ -11,8 +11,23 @@ from app.services.memory_extractor import extract_memory
 from app.services.openai_client import client
 from app.services.sol_agent import stream_sol_response
 import logging
+import re
+from app.services.subscription_service import check_can_send_message, increment_message_count
 
 logger = logging.getLogger("sol")
+
+def extract_and_strip_feedback(content: str) -> tuple[str, dict | None]:
+    pattern = r'\[FEEDBACK::([^:]+)::([^:]+)::([^\]]+)\]'
+    match = re.search(pattern, content)
+    if not match:
+        return content, None
+    category, sentiment, quote = match.groups()
+    cleaned = re.sub(pattern, '', content).strip()
+    return cleaned, {
+        "category": category.strip(),
+        "sentiment": sentiment.strip(),
+        "quote": quote.strip()
+    }
 router = APIRouter(prefix="/messages", tags=["messages"])
 
 
@@ -26,6 +41,20 @@ async def verify_session(session_id: str, user_id: str):
 @router.post("/send")
 async def send_message(payload: SendMessageRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
     await verify_session(payload.session_id, user.id)
+
+    limit_check = await check_can_send_message(user.id)
+    if not limit_check["allowed"]:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": True,
+                "code": "TRIAL_EXCEEDED",
+                "message": "You've used all 20 free messages.",
+                "messages_used": limit_check["messages_used"],
+                "limit": limit_check["limit"]
+            }
+        )
+
     try:
         supabase.table("messages").insert({
             "session_id": payload.session_id, "role": "user", "content": payload.content
@@ -40,10 +69,29 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
         )
         assistant_reply = completion.choices[0].message.content.strip()
 
+        clean_content, feedback_data = extract_and_strip_feedback(assistant_reply)
+
         res = supabase.table("messages").insert({
-            "session_id": payload.session_id, "role": "assistant", "content": assistant_reply
+            "session_id": payload.session_id, "role": "assistant", "content": clean_content
         }).execute()
-        final_msg = res.data[0] if (hasattr(res, 'data') and res.data) else {"content": assistant_reply}
+        final_msg = res.data[0] if (hasattr(res, 'data') and res.data) else {"content": clean_content}
+
+        if feedback_data:
+            try:
+                supabase.table("feedback").insert({
+                    "user_id": user.id,
+                    "session_id": payload.session_id,
+                    "feedback_text": feedback_data["quote"],
+                    "sol_response": clean_content,
+                    "sentiment": feedback_data["sentiment"],
+                    "category": feedback_data["category"],
+                    "resolved": False
+                }).execute()
+                logger.info(f"Feedback captured: {feedback_data['category']} — {feedback_data['quote']}")
+            except Exception as fe:
+                logger.warning(f"Feedback save failed (non-fatal): {fe}")
+
+        await increment_message_count(user.id)
 
         background_tasks.add_task(extract_memory, user.id, payload.session_id, payload.content, assistant_reply)
         return final_msg
@@ -56,6 +104,19 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
 @router.post("/send-stream")
 async def send_message_stream(payload: SendMessageRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
     await verify_session(payload.session_id, user.id)
+
+    limit_check = await check_can_send_message(user.id)
+    if not limit_check["allowed"]:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": True,
+                "code": "TRIAL_EXCEEDED",
+                "message": "You've used all 20 free messages.",
+                "messages_used": limit_check["messages_used"],
+                "limit": limit_check["limit"]
+            }
+        )
 
     try:
         supabase.table("messages").insert({
@@ -85,13 +146,32 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
                         except Exception:
                             pass
 
+                clean_content, feedback_data = extract_and_strip_feedback(full_content)
+
                 # Save assistant message to DB
                 if full_content:
                     supabase.table("messages").insert({
                         "session_id": payload.session_id,
                         "role": "assistant",
-                        "content": full_content
+                        "content": clean_content
                     }).execute()
+
+                if feedback_data:
+                    try:
+                        supabase.table("feedback").insert({
+                            "user_id": user.id,
+                            "session_id": payload.session_id,
+                            "feedback_text": feedback_data["quote"],
+                            "sol_response": clean_content,
+                            "sentiment": feedback_data["sentiment"],
+                            "category": feedback_data["category"],
+                            "resolved": False
+                        }).execute()
+                        logger.info(f"Feedback captured: {feedback_data['category']} — {feedback_data['quote']}")
+                    except Exception as fe:
+                        logger.warning(f"Feedback save failed (non-fatal): {fe}")
+
+                await increment_message_count(user.id)
 
                 # Run memory extraction in background
                 if full_content:

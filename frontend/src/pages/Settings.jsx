@@ -3,6 +3,8 @@ import { api } from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { AppShell } from '../components/layout/AppShell';
+import { CustomDropdown } from '../components/ui/CustomDropdown';
+import { TherapistPicker } from '../components/settings/TherapistPicker';
 
 const FOCUS_AREAS = [
   "Emotional support", "Academic stress", "Relationship advice", 
@@ -11,7 +13,7 @@ const FOCUS_AREAS = [
 ];
 
 export default function Settings() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('therapist'); // 'therapist' | 'intake'
@@ -20,7 +22,6 @@ export default function Settings() {
   const [tSettings, setTSettings] = useState({
     therapist_tone: 'Like a warm friend',
     response_length: 'Balanced',
-    preferred_language: 'English',
     therapist_focus: []
   });
 
@@ -29,28 +30,20 @@ export default function Settings() {
       setTSettings({
         therapist_tone: profile.therapist_settings.therapist_tone || 'Like a warm friend',
         response_length: profile.therapist_settings.response_length || 'Balanced',
-        preferred_language: profile.therapist_settings.preferred_language || 'English',
         therapist_focus: profile.therapist_settings.therapist_focus || []
       });
     }
 
-    const fetchIntake = async () => {
-      try {
-        const res = await api.get('/api/profile/me');
-        if (res.data?.intake_responses) {
-          setIntakeData(res.data.intake_responses);
-        }
-      } catch (e) {
-        console.error("Failed to load intake answers", e);
-      }
-    };
-    fetchIntake();
+    if (profile?.intake_responses) {
+      setIntakeData(profile.intake_responses);
+    }
   }, [profile]);
 
   const saveTherapistSettings = async () => {
     setLoading(true);
     try {
       await api.patch('/api/profile/therapist-settings', tSettings);
+      await refreshProfile();
       addToast('Therapist preferences updated.', 'success');
     } catch (e) {
       addToast('Failed to update preferences.', 'error');
@@ -97,31 +90,27 @@ export default function Settings() {
              <section className="space-y-8 animate-fade-in">
                 <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-6">
                    <div>
-                     <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Tone & Style</label>
-                     <select 
+                     <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Sol Persona</label>
+                     <TherapistPicker
                        value={tSettings.therapist_tone}
-                       onChange={e => setTSettings({...tSettings, therapist_tone: e.target.value})}
-                       className="sol-input appearance-none bg-white"
-                     >
-                        <option>Like a warm friend</option>
-                        <option>Direct and coaching-oriented</option>
-                        <option>Deeply psychological/clinical</option>
-                        <option>Gentle and unconditionally validating</option>
-                     </select>
+                       onChange={(tone) => setTSettings({...tSettings, therapist_tone: tone})}
+                     />
                    </div>
                    
                    <div>
                      <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Response Length</label>
-                     <select 
+                     <CustomDropdown
                        value={tSettings.response_length}
-                       onChange={e => setTSettings({...tSettings, response_length: e.target.value})}
-                       className="sol-input appearance-none bg-white"
-                     >
-                        <option>Concise (Get to the point)</option>
-                        <option>Balanced</option>
-                        <option>Detailed (Long, thoughtful prose)</option>
-                     </select>
+                       onChange={(val) => setTSettings({...tSettings, response_length: val})}
+                       options={[
+                         { value: 'Concise (Get to the point)', label: 'Concise (Get to the point)' },
+                         { value: 'Balanced', label: 'Balanced' },
+                         { value: 'Detailed (Long, thoughtful prose)', label: 'Detailed (Long, thoughtful prose)' }
+                       ]}
+                     />
                    </div>
+
+
 
                    <div>
                      <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Therapeutic Focus Areas (Max 3)</label>

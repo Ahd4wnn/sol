@@ -7,6 +7,7 @@ import { Play, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
 import { api } from '../lib/axios';
 import { AppShell } from '../components/layout/AppShell';
 import { Clock } from 'lucide-react'
+import { UpgradeModal, useUpgradeModal } from '../components/upgrade/UpgradeModal'
 
 const SUBTEXTS = [
   "Take a slow, deep breath.",
@@ -21,6 +22,20 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subtextIndex, setSubtextIndex] = useState(0);
+  const [billingStatus, setBillingStatus] = useState(null);
+
+  useEffect(() => {
+    api.get('/api/billing/status')
+      .then(r => setBillingStatus(r.data))
+      .catch(() => {})  // non-fatal
+  }, []);
+
+  const isPro = billingStatus?.is_pro || false;
+  const messagesUsed = billingStatus?.messages_used || 0;
+  const messagesLimit = billingStatus?.messages_limit || 20;
+  const messagesRemaining = messagesLimit - messagesUsed;
+
+  const { isOpen: upgradeModalOpen, close: closeUpgradeModal } = useUpgradeModal(isPro);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -129,6 +144,107 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Upgrade Banner */}
+          {!isPro && billingStatus && (
+            <div style={{
+              margin: '0 0 24px',
+              padding: '16px 20px',
+              borderRadius: 16,
+              background: 'rgba(201,107,46,0.06)',
+              border: '1px solid rgba(201,107,46,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Progress bar for messages */}
+                <div style={{ position: 'relative' }}>
+                  <svg width="44" height="44" viewBox="0 0 44 44">
+                    {/* Background circle */}
+                    <circle cx="22" cy="22" r="18"
+                      fill="none" stroke="#F0EBE5" strokeWidth="3" />
+                    {/* Progress circle */}
+                    <circle cx="22" cy="22" r="18"
+                      fill="none"
+                      stroke={messagesRemaining <= 5 ? '#C0392B' : '#C96B2E'}
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 18}`}
+                      strokeDashoffset={`${2 * Math.PI * 18 * (1 - messagesUsed / messagesLimit)}`}
+                      transform="rotate(-90 22 22)"
+                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                    />
+                    {/* Count in center */}
+                    <text x="22" y="27" textAnchor="middle"
+                      style={{
+                        fontSize: 13,
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 600,
+                        fill: messagesRemaining <= 5 ? '#C0392B' : '#C96B2E',
+                      }}>
+                      {messagesRemaining}
+                    </text>
+                  </svg>
+                </div>
+
+                <div>
+                  <div style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: '#1A1714',
+                  }}>
+                    {messagesRemaining > 0
+                      ? `${messagesRemaining} free messages remaining`
+                      : 'Free messages used up'}
+                  </div>
+                  <div style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: 13,
+                    color: '#9E8E7E',
+                    marginTop: 2,
+                  }}>
+                    {messagesRemaining > 5
+                      ? 'Upgrade anytime for unlimited sessions'
+                      : messagesRemaining > 0
+                        ? 'Running low — upgrade to keep going'
+                        : 'Upgrade to continue talking to Sol'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/upgrade')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 999,
+                  border: '1.5px solid #C96B2E',
+                  background: 'transparent',
+                  color: '#C96B2E',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 150ms ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#C96B2E'
+                  e.currentTarget.style.color = 'white'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = '#C96B2E'
+                }}
+              >
+                Upgrade to Pro →
+              </button>
+            </div>
+          )}
+
           {/* Stats Row */}
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
@@ -202,6 +318,7 @@ export default function Dashboard() {
           </motion.div>
         </div>
       </div>
+      <UpgradeModal isOpen={upgradeModalOpen} onClose={closeUpgradeModal} />
     </AppShell>
   );
 }

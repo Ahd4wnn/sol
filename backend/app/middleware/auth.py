@@ -1,19 +1,41 @@
-from fastapi import Request, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
+from fastapi import HTTPException, Header
 from app.services.supabase_client import supabase
+from typing import Optional
 
-security = HTTPBearer()
+logger = logging.getLogger("sol")
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
-    token = credentials.credentials
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": True, "message": "No authorization header", "code": "NO_TOKEN"}
+        )
+
+    # Handle both "Bearer token" and raw token
+    token = authorization
+    if authorization.startswith("Bearer "):
+        token = authorization[7:]
+
+    if not token or token == "undefined" or token == "null":
+        raise HTTPException(
+            status_code=401,
+            detail={"error": True, "message": "Invalid token", "code": "INVALID_TOKEN"}
+        )
+
     try:
         user_response = supabase.auth.get_user(token)
-        # Handle dict, UserResponse, etc. based on supabase-py's version implementation
-        if hasattr(user_response, 'user') and user_response.user:
-            return user_response.user
-        raise HTTPException(status_code=401, detail="Invalid token")
+        if not user_response or not user_response.user:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": True, "message": "Token invalid or expired", "code": "TOKEN_EXPIRED"}
+            )
+        return user_response.user
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Auth validation error: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+        logger.error(f"Auth verification failed: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail={"error": True, "message": "Authentication failed", "code": "AUTH_FAILED"}
+        )

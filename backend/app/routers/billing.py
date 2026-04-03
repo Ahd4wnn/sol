@@ -1,0 +1,147 @@
+import razorpay
+import hmac
+import hashlib
+import json
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.middleware.auth import get_current_user
+from app.services.supabase_client import supabase
+from app.services.subscription_service import get_subscription
+from app.config import settings
+import logging
+from datetime import datetime, timedelta
+
+logger = logging.getLogger("sol")
+router = APIRouter(prefix="/billing", tags=["billing"])
+
+PLANS = {
+    "pro_monthly": {
+        "amount": 900,          # $9.00 in cents
+        "currency": "USD",
+        "period": "monthly",
+        "interval": 1,
+        "description": "Sol Pro — Monthly"
+    },
+    "pro_yearly": {
+        "amount": 8900,         # $89.00 in cents
+        "currency": "USD",
+        "period": "yearly",
+        "interval": 1,
+        "description": "Sol Pro — Yearly"
+    }
+}
+
+def get_razorpay_client():
+    return razorpay.Client(
+        auth=(settings.razorpay_key_id, settings.razorpay_key_secret)
+    )
+
+@router.get("/status")
+async def get_billing_status(user=Depends(get_current_user)):
+    """Returns current subscription + message count for the frontend."""
+    try:
+        from app.services.subscription_service import get_message_count
+        sub = await get_subscription(user.id)
+        count = await get_message_count(user.id)
+        return {
+            "plan": sub.get("plan", "free"),
+            "status": sub.get("status", "active"),
+            "messages_used": count,
+            "messages_limit": 20,
+            "is_pro": sub.get("plan") in ("pro_monthly", "pro_yearly")
+                      and sub.get("status") in ("active", "gifted"),
+            "period_end": sub.get("current_period_end"),
+        }
+    except Exception as e:
+        logger.error(f"get_billing_status failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not fetch billing status"})
+
+@router.post("/create-order")
+async def create_order(payload: dict, user=Depends(get_current_user)):
+    """Creates a Razorpay order for one-time or subscription checkout."""
+    try:
+        plan_id = payload.get("plan")
+        if plan_id not in PLANS:
+            raise HTTPException(status_code=400, detail={"error": True, "message": "Invalid plan"})
+
+        plan = PLANS[plan_id]
+        client = get_razorpay_client()
+
+        order = client.order.create({
+            "amount": plan["amount"],
+            "currency": plan["currency"],
+            "notes": {
+                "user_id": user.id,
+                "plan": plan_id,
+                "email": user.email
+            }
+        })
+
+        return {
+            "order_id": order["id"],
+            "amount": plan["amount"],
+            "currency": plan["currency"],
+            "plan": plan_id,
+            "description": plan["description"],
+            "key_id": settings.razorpay_key_id,
+            "user_email": user.email,
+        }
+
+    except Exception as e:
+        logger.error(f"create_order failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not create order"})
+
+@router.post("/verify-payment")
+async def verify_payment(payload: dict, user=Depends(get_current_user)):
+    """Verifies Razorpay payment signature and activates subscription."""
+    try:
+        order_id = payload.get("razorpay_order_id")
+        payment_id = payload.get("razorpay_payment_id")
+        signature = payload.get("razorpay_signature")
+        plan_id = payload.get("plan")
+
+        # Verify signature
+        expected = hmac.new(
+            settings.razorpay_key_secret.encode(),
+            f"{order_id}|{payment_id}".encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if expected != signature:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": True, "message": "Payment verification failed"}
+            )
+
+        # Activate subscription
+        now = datetime.utcnow()
+        period_end = now + timedelta(days=365 if plan_id == "pro_yearly" else 30)
+
+        supabase.table("subscriptions").upsert({
+            "user_id": user.id,
+            "plan": plan_id,
+            "status": "active",
+            "razorpay_subscription_id": payment_id,
+            "current_period_start": now.isoformat(),
+            "current_period_end": period_end.isoformat(),
+            "updated_at": now.isoformat()
+        }, on_conflict="user_id").execute()
+
+        logger.info(f"Subscription activated: user={user.id} plan={plan_id}")
+        return {"success": True, "plan": plan_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"verify_payment failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Payment verification failed"})
+
+@router.post("/cancel")
+async def cancel_subscription(user=Depends(get_current_user)):
+    try:
+        supabase.table("subscriptions")\
+            .update({"status": "cancelled", "updated_at": datetime.utcnow().isoformat()})\
+            .eq("user_id", user.id).execute()
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"cancel_subscription failed: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not cancel"})

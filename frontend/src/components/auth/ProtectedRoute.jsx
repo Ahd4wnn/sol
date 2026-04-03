@@ -5,10 +5,17 @@ export function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
+  // Never redirect while loading — wait for auth to resolve
   if (loading) return null
 
   if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />
+    return (
+      <Navigate
+        to="/auth"
+        state={{ from: location.pathname }}
+        replace
+      />
+    )
   }
 
   return children

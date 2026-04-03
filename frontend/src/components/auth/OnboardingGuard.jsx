@@ -4,8 +4,10 @@ import { useAuth } from '../../context/AuthContext'
 export function OnboardingGuard({ children }) {
   const { user, profile, loading } = useAuth()
 
-  if (loading) return null
+  // Wait for both auth and profile to load
+  if (loading || (user && profile === null)) return null
 
+  // If profile loaded and onboarding not done → redirect
   if (user && profile && !profile.onboarding_completed) {
     return <Navigate to="/onboarding" replace />
   }

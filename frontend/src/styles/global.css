@@ -5,12 +5,12 @@
 @layer base {
   :root {
     /* Mesh gradient backgrounds */
-    /* --mesh-home:
+    --mesh-home:
       radial-gradient(ellipse at 15% 40%, rgba(201, 107, 46, 0.18) 0%, transparent 55%),
       radial-gradient(ellipse at 85% 15%, rgba(253, 220, 190, 0.25) 0%, transparent 50%),
       radial-gradient(ellipse at 60% 85%, rgba(245, 230, 216, 0.3) 0%, transparent 55%),
       radial-gradient(ellipse at 40% 60%, rgba(255, 200, 150, 0.12) 0%, transparent 45%),
-      #F9F7F4; */
+      #F9F7F4;
 
     --mesh-sidebar:
       radial-gradient(ellipse at 50% 90%, rgba(201, 107, 46, 0.1) 0%, transparent 60%),
@@ -164,6 +164,9 @@
 @media (max-width: 768px) {
   .sol-sidebar {
     display: none !important;
+  }
+  .landing-nav-signin {
+    display: none;
   }
 }
 

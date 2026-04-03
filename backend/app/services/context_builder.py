@@ -54,6 +54,8 @@ async def build_context(user_id: str, session_id: str) -> dict:
                 relationship_notes.append(note_text)
             else:
                 memory_notes.append(note_text)
+                
+        logger.info(f"Found {len(relationship_notes)} relationship notes for user {user_id}")
 
         # 5. Session metadata
         session_res = supabase.table("therapy_sessions")\

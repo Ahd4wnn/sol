@@ -55,21 +55,21 @@ export default function NewSession() {
           <motion.div
             key="step1"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full"
+            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full overflow-hidden"
           >
             <h2 className="font-display italic text-4xl mb-4 text-center text-sol-text-primary">How are you arriving?</h2>
             <p className="text-sol-text-secondary mb-12 text-center text-lg">Don't overthink it. Just a quick pulse check.</p>
             
-            <div className="flex justify-between w-full gap-2 md:gap-4 mb-16">
+            <div className="flex justify-center flex-wrap w-full gap-3 md:gap-4 mb-16">
               {MOODS.map(m => (
                 <button
                   key={m.val}
                   onClick={() => { setMoodBefore(m.val); setTimeout(handleNext, 300); }}
-                  className={`flex flex-col items-center gap-3 p-4 rounded-3xl border-2 transition-transform ${
+                  className={`flex flex-col items-center p-3 md:p-4 rounded-3xl border-2 transition-transform ${
                     moodBefore === m.val ? `scale-110 ${m.color}` : 'border-transparent bg-sol-surface hover:scale-105 shadow-sm hover:shadow-md'
                   }`}
                 >
-                  <span className="text-4xl">{m.icon}</span>
+                  <span className="text-3xl md:text-4xl">{m.icon}</span>
                 </button>
               ))}
             </div>
@@ -80,7 +80,7 @@ export default function NewSession() {
           <motion.div
             key="step2"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full"
+            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full overflow-hidden"
           >
             <h2 className="font-display italic text-3xl md:text-4xl mb-4 text-center">If you had to name that feeling in one word?</h2>
             <p className="text-sol-text-secondary mb-10 text-center">e.g. anxious, excited, numb, exhausted</p>
@@ -110,7 +110,7 @@ export default function NewSession() {
           <motion.div
             key="step3"
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full"
+            className="flex flex-col items-center max-w-lg mx-auto glass-heavy p-8 rounded-3xl w-full overflow-hidden"
           >
             <h2 className="font-display italic text-3xl md:text-4xl mb-4 text-center">What's on your mind?</h2>
             <p className="text-sol-text-secondary mb-10 text-center">Sol will read this before you enter the room so you don't have to start from scratch.</p>

@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { AppShell } from '../components/layout/AppShell';
 
 export default function Profile() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
   
@@ -33,6 +33,7 @@ export default function Profile() {
     setLoading(true);
     try {
       await api.patch('/api/profile/update', formData);
+      await refreshProfile();
       addToast('Profile saved successfully', 'success');
     } catch (err) {
       addToast('Failed to save profile', 'error');
