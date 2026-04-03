@@ -8,4 +8,4 @@ openai
 httpx
 openai-agents>=0.0.9
 razorpay==1.4.2
-setuptools
+setuptools<70.0.0
