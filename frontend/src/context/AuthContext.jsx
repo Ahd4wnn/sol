@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import api from '../lib/api'
 
 const AuthContext = createContext({})
 
@@ -20,9 +21,7 @@ export function AuthProvider({ children }) {
     if (profileFetchedFor.current === userId) return // already fetched
     profileFetchedFor.current = userId
     try {
-      const { data } = await import('../lib/api').then(m =>
-        m.default.get('/api/profile/me')
-      )
+      const { data } = await api.get('/api/profile/me')
       setProfile(data)
     } catch (err) {
       console.error('[AuthContext] Profile fetch failed:', err)
