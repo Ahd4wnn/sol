@@ -3,6 +3,8 @@ from app.middleware.auth import get_current_user
 from app.services.supabase_client import supabase
 from app.config import settings
 from datetime import datetime
+import string
+import random
 import logging
 
 logger = logging.getLogger("sol")
@@ -181,3 +183,40 @@ async def resolve_feedback(feedback_id: str, admin=Depends(require_admin)):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": True, "message": "Could not resolve"})
+
+@router.post("/generate-codes")
+async def generate_codes(admin=Depends(require_admin)):
+    try:
+        existing_res = supabase.table("early_member_codes").select("id").execute()
+        existing = len(existing_res.data or [])
+        if existing >= 100:
+            return {"count": 0, "message": "All 100 codes generated max"}
+            
+        needed = 100 - existing
+        new_codes = []
+        for i in range(needed):
+            code = "SOL-EARLY-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=5))
+            new_codes.append({
+                "code": code,
+                "member_number": existing + i + 1
+            })
+            
+        if new_codes:
+            supabase.table("early_member_codes").insert(new_codes).execute()
+            
+        return {"count": len(new_codes)}
+    except Exception as e:
+        logger.error(f"generate-codes failed: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not generate codes"})
+
+@router.get("/codes")
+async def list_codes(admin=Depends(require_admin)):
+    try:
+        res = supabase.table("early_member_codes")\
+            .select("*, profiles(preferred_name, full_name, email)")\
+            .order("member_number", desc=False)\
+            .execute()
+        return {"codes": res.data or []}
+    except Exception as e:
+        logger.error(f"list_codes failed: {e}")
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not fetch codes"})

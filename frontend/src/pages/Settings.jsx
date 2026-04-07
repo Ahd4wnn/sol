@@ -5,6 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { AppShell } from '../components/layout/AppShell';
 import { CustomDropdown } from '../components/ui/CustomDropdown';
 import { TherapistPicker } from '../components/settings/TherapistPicker';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const FOCUS_AREAS = [
   "Emotional support", "Academic stress", "Relationship advice", 
@@ -16,8 +17,10 @@ export default function Settings() {
   const { profile, refreshProfile } = useAuth();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('therapist'); // 'therapist' | 'intake'
+  const [activeTab, setActiveTab] = useState('therapist');
   const [intakeData, setIntakeData] = useState(null);
+  
+  const { permission, subscribed, subscribe, unsubscribe } = usePushNotifications();
 
   const [tSettings, setTSettings] = useState({
     therapist_tone: 'Like a warm friend',
@@ -84,6 +87,12 @@ export default function Settings() {
              >
                Initial Intake Answers
              </button>
+             <button 
+               onClick={() => setActiveTab('redeem')}
+               className={`pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'redeem' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
+             >
+               ✦ Redeem Code
+             </button>
            </div>
 
            {activeTab === 'therapist' && (
@@ -136,6 +145,61 @@ export default function Settings() {
                        {loading ? 'Saving...' : 'Update Sol'}
                      </button>
                    </div>
+
+                   {/* Push notification toggle */}
+                   <div style={{ marginTop: 24, padding: '24px 0 0', borderTop: '1px solid #F0EBE5' }}>
+                     <label style={{ fontSize: 13, color: '#6B6560', fontWeight: 600,
+                                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                                    display: 'block', marginBottom: 12 }}>
+                       Notifications
+                     </label>
+                     <div style={{
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'space-between',
+                       padding: '16px 20px',
+                       borderRadius: 14,
+                       background: 'rgba(255,252,248,0.8)',
+                       border: '1px solid #E8E3DD',
+                     }}>
+                       <div>
+                         <div style={{ fontSize: 15, fontWeight: 500, color: '#1A1714' }}>
+                           Push notifications
+                         </div>
+                         <div style={{ fontSize: 13, color: '#9E8E7E', marginTop: 2 }}>
+                           Daily check-ins and session reminders
+                         </div>
+                       </div>
+                       {permission === 'unsupported' ? (
+                         <span style={{ fontSize: 12, color: '#9E8E7E' }}>Not supported</span>
+                       ) : (
+                         <button
+                           onClick={subscribed ? unsubscribe : subscribe}
+                           style={{
+                             padding: '8px 18px',
+                             borderRadius: 999,
+                             border: 'none',
+                             background: subscribed ? '#F0EBE5' : '#C96B2E',
+                             color: subscribed ? '#9E8E7E' : 'white',
+                             fontFamily: 'DM Sans, sans-serif',
+                             fontSize: 13,
+                             fontWeight: 500,
+                             cursor: 'pointer',
+                             transition: 'all 150ms',
+                             flexShrink: 0,
+                           }}
+                         >
+                           {subscribed ? 'Turn off' : 'Turn on'}
+                         </button>
+                       )}
+                     </div>
+                     {permission === 'denied' && (
+                       <p style={{ fontSize: 12, color: '#C0392B', marginTop: 8 }}>
+                         Notifications are blocked. Enable them in your browser settings.
+                       </p>
+                     )}
+                   </div>
+                   
                 </div>
              </section>
            )}
@@ -166,8 +230,174 @@ export default function Settings() {
                </div>
              </section>
            )}
+
+           {activeTab === 'redeem' && (
+             <section className="animate-fade-in flex justify-center">
+               <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mb-6 w-full max-w-md">
+                 <RedeemTab profile={profile} onRedeemed={refreshProfile} />
+               </div>
+             </section>
+           )}
         </main>
       </div>
     </AppShell>
   );
+}
+
+function RedeemTab({ profile, onRedeemed }) {
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+
+  if (profile?.is_early_member) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>☀️</div>
+        <div style={{
+          fontFamily: 'Fraunces, serif',
+          fontSize: 22,
+          fontWeight: 300,
+          color: '#1A1714',
+          marginBottom: 8,
+        }}>
+          Early Member #{String(profile.early_member_number).padStart(3, '0')}
+        </div>
+        <div style={{ fontSize: 14, color: '#9E8E7E' }}>
+          Your card is active. Check the sidebar to view it.
+        </div>
+      </div>
+    )
+  }
+
+  const handleRedeem = async () => {
+    if (!code.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      // Hardcoded explicit fetch since `api` uses different references
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/profile/redeem-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('sb-gjggujmxcmduleftuboi-auth-token') ? JSON.parse(localStorage.getItem('sb-gjggujmxcmduleftuboi-auth-token')).access_token : ''}`
+        },
+        body: JSON.stringify({ code: code.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail?.message || data.detail || 'Invalid code.')
+      setSuccess(data)
+      onRedeemed?.()
+    } catch (err) {
+      setError(err.message || 'Invalid code.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <div style={{ fontSize: 52, marginBottom: 16,
+                     animation: 'popIn 0.5s cubic-bezier(0.16,1,0.3,1)' }}>
+          ☀️
+        </div>
+        <div style={{
+          fontFamily: 'Fraunces, serif',
+          fontSize: 24,
+          fontWeight: 300,
+          color: '#1A1714',
+          marginBottom: 8,
+        }}>You're in.</div>
+        <div style={{ fontSize: 15, color: '#6B6560', marginBottom: 20 }}>
+          Welcome, Early Member #{String(success.member_number).padStart(3, '0')}.
+          Your card is waiting in the sidebar.
+        </div>
+        <div style={{
+          padding: '10px 20px',
+          borderRadius: 999,
+          background: 'rgba(201,107,46,0.08)',
+          border: '1px solid rgba(201,107,46,0.2)',
+          display: 'inline-block',
+          fontSize: 13,
+          color: '#C96B2E',
+          fontWeight: 500,
+        }}>
+          70 free messages · Unlimited memory · Early Member badge
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ maxWidth: 400, margin: '0 auto' }}>
+      <h2 style={{
+        fontFamily: 'Fraunces, serif',
+        fontSize: 26,
+        fontWeight: 300,
+        marginBottom: 8,
+        color: '#1A1714',
+      }}>Got a code?</h2>
+      <p style={{ fontSize: 14, color: '#6B6560', marginBottom: 28, lineHeight: 1.6 }}>
+        If you received a Sol Early Accelerator code, enter it below
+        to unlock your membership card and exclusive perks.
+      </p>
+
+      <div style={{ marginBottom: 16 }}>
+        <input
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          placeholder="SOL-001-XXXXXXXX"
+          onKeyDown={e => e.key === 'Enter' && handleRedeem()}
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            borderRadius: 14,
+            border: `1.5px solid ${error ? '#C0392B' : '#E8E3DD'}`,
+            background: 'rgba(255,252,248,0.8)',
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 16,
+            letterSpacing: '0.06em',
+            fontWeight: 500,
+            color: '#1A1714',
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'border-color 150ms',
+          }}
+          onFocus={e => { e.target.style.borderColor = '#C96B2E'; setError(null) }}
+          onBlur={e => e.target.style.borderColor = error ? '#C0392B' : '#E8E3DD'}
+        />
+      </div>
+
+      {error && (
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: 'rgba(192,57,43,0.08)',
+          border: '1px solid rgba(192,57,43,0.2)',
+          fontSize: 13,
+          color: '#C0392B',
+          marginBottom: 14,
+        }}>{error}</div>
+      )}
+
+      <button
+        onClick={handleRedeem}
+        disabled={!code.trim() || loading}
+        className="btn-primary"
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: 15,
+          opacity: !code.trim() ? 0.5 : 1,
+        }}
+      >
+        {loading ? 'Checking...' : 'Redeem code →'}
+      </button>
+
+      <p style={{ fontSize: 12, color: '#C8C3BD', marginTop: 14, textAlign: 'center' }}>
+        Codes are single-use and tied to your account.
+      </p>
+    </div>
+  )
 }

@@ -11,6 +11,7 @@ export default function Admin() {
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
   const [feedback, setFeedback] = useState([])
+  const [codes, setCodes] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [giftUserId, setGiftUserId] = useState('')
   const [giftPlan, setGiftPlan] = useState('pro_monthly')
@@ -26,14 +27,16 @@ export default function Admin() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [statsRes, usersRes, feedbackRes] = await Promise.all([
-        api.get('/api/admin/stats'),
-        api.get('/api/admin/users'),
-        api.get('/api/admin/feedback?resolved=false'),
+      const [statsRes, usersRes, feedbackRes, codesRes] = await Promise.all([
+        api.get('/api/admin/stats').catch(e => ({ data: null })),
+        api.get('/api/admin/users').catch(e => ({ data: { users: [] } })),
+        api.get('/api/admin/feedback?resolved=false').catch(e => ({ data: { feedback: [] } })),
+        api.get('/api/admin/codes').catch(e => ({ data: { codes: [] } })),
       ])
       setStats(statsRes.data)
-      setUsers(usersRes.data.users || [])
-      setFeedback(feedbackRes.data.feedback || [])
+      setUsers(usersRes.data?.users || [])
+      setFeedback(feedbackRes.data?.feedback || [])
+      setCodes(codesRes.data?.codes || [])
     } catch (err) {
       console.error('Admin load failed:', err)
       if (err.response?.status === 403) navigate('/dashboard')
@@ -86,7 +89,7 @@ export default function Admin() {
     </div>
   )
 
-  const TABS = ['overview', 'users', 'feedback', 'gift']
+  const TABS = ['overview', 'users', 'feedback', 'gift', 'codes']
 
   return (
     <div style={{ minHeight: '100vh', background: '#F9F7F4',
@@ -394,6 +397,89 @@ export default function Admin() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* CODES TAB */}
+        {activeTab === 'codes' && (
+          <div style={{ maxWidth: 800 }}>
+            <h2 style={{ fontFamily: 'Fraunces, serif', fontWeight: 300,
+                        fontSize: 28, marginBottom: 24 }}>
+              Early Access Codes ({codes.length})
+            </h2>
+            <div style={{ background: 'white', borderRadius: 20,
+                         border: '1px solid #E8E3DD', padding: '32px', marginBottom: 24 }}>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.post('/api/admin/generate-codes')
+                    alert(`Generated ${res.data.count} codes!`)
+                    loadData()
+                  } catch (e) {
+                    alert('Error: ' + (e.response?.data?.detail || e.message))
+                  }
+                }}
+                className="btn-mesh"
+                style={{ width: '100%', padding: '14px', fontSize: 14 }}
+              >
+                Generate 100 Early Codes
+              </button>
+              <p style={{ fontSize: 13, color: '#6B6560', marginTop: 16, textAlign: 'center' }}>
+                Note: This generates numbers 1-100 without overwriting existing ones.
+              </p>
+            </div>
+
+            {codes.length > 0 && (
+              <div style={{ background: 'white', borderRadius: 16,
+                           border: '1px solid #E8E3DD', overflow: 'hidden' }}>
+                <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F9F7F4' }}>
+                      <tr>
+                        {['No.', 'Code', 'Status', 'Redeemed By', 'Date'].map(h => (
+                          <th key={h} style={{ padding: '12px 16px', textAlign: 'left',
+                                             fontSize: 12, color: '#9E8E7E',
+                                             fontWeight: 600, textTransform: 'uppercase',
+                                             letterSpacing: '0.05em',
+                                             borderBottom: '1px solid #E8E3DD' }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {codes.map((c, i) => (
+                        <tr key={c.id} style={{
+                          borderBottom: i < codes.length - 1 ? '1px solid #F0EBE5' : 'none'
+                        }}>
+                          <td style={{ padding: '12px 16px', fontSize: 14, color: '#1A1714', fontWeight: 500 }}>
+                            #{String(c.member_number).padStart(3, '0')}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#6B6560', fontFamily: 'monospace' }}>
+                            {c.code}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{
+                              padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
+                              background: c.redeemed_by ? '#FEE8E8' : '#E8F5EF',
+                              color: c.redeemed_by ? '#C0392B' : '#3D7A5F',
+                            }}>
+                              {c.redeemed_by ? 'Redeemed' : 'Available'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#6B6560' }}>
+                            {c.profiles?.preferred_name || c.profiles?.full_name || c.profiles?.email || '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: '#9E8E7E' }}>
+                            {c.redeemed_at ? new Date(c.redeemed_at).toLocaleDateString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

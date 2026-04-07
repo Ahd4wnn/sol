@@ -3,7 +3,7 @@ import time
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import auth, sessions, profile, agent, memory, messages, admin, billing
+from app.routers import auth, sessions, profile, agent, memory, messages, admin, billing, push, notifications
 from app.services.supabase_client import supabase
 
 logging.basicConfig(
@@ -46,6 +46,8 @@ api_router.include_router(memory.router)
 api_router.include_router(messages.router)
 api_router.include_router(admin.router)
 api_router.include_router(billing.router)
+api_router.include_router(push.router)
+api_router.include_router(notifications.router)
 
 app.include_router(api_router)
 

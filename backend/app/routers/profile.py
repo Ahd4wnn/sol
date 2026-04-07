@@ -4,6 +4,7 @@ from app.middleware.auth import get_current_user
 from app.services.supabase_client import supabase
 from app.models.profile import IntakeRequest
 from app.models.schemas import UpdateProfileRequest, UpdateTherapistSettingsRequest, UpdateIntakeAnswerRequest
+from datetime import datetime
 
 logger = logging.getLogger("sol")
 router = APIRouter(prefix="/profile", tags=["profile"])
@@ -163,3 +164,41 @@ def delete_account(user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"delete_account failed for user {user.id}: {e}")
         raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+
+@router.post("/redeem-code")
+async def redeem_code(payload: dict, user=Depends(get_current_user)):
+    try:
+        code = payload.get("code", "").upper().strip()
+        # Find code
+        res = supabase.table("early_member_codes").select("*").eq("code", code).execute()
+        codes = res.data or []
+        if not codes:
+            raise HTTPException(status_code=400, detail="Invalid code.")
+            
+        code_row = codes[0]
+        if code_row.get("redeemed_by"):
+            if code_row.get("redeemed_by") == user.id:
+                return {"success": True, "message": "Already redeemed", "member_number": code_row["member_number"]}
+            raise HTTPException(status_code=400, detail="Code already redeemed by someone else.")
+            
+        # Update code
+        now_iso = datetime.utcnow().isoformat()
+        supabase.table("early_member_codes").update({
+            "redeemed_by": user.id,
+            "redeemed_at": now_iso
+        }).eq("id", code_row["id"]).execute()
+        
+        # Update user
+        supabase.table("profiles").update({
+            "is_early_member": True,
+            "early_member_number": code_row["member_number"],
+            "early_member_code_used": code,
+            "early_member_granted_at": now_iso
+        }).eq("id", user.id).execute()
+        
+        return {"success": True, "member_number": code_row["member_number"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"redeem-code failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not redeem.")

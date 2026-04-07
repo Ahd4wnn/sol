@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sol — Offline</title>
+  <style>
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #F9F7F4;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+      padding: 24px;
+    }
+    .orb {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: #C96B2E;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    h2 { font-size: 24px; color: #1A1714; font-weight: 400; margin: 0; }
+    p { color: #6B6560; font-size: 15px; max-width: 300px; line-height: 1.6; margin: 0; }
+    button {
+      margin-top: 8px;
+      padding: 12px 28px;
+      border-radius: 999px;
+      border: none;
+      background: #C96B2E;
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb">☀️</div>
+  <h2>You're offline</h2>
+  <p>Sol needs a connection to respond. Come back when you're connected.</p>
+  <button onclick="location.reload()">Try again</button>
+</body>
+</html>

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { Home, Clock, Brain, Settings } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../../lib/axios'
+import { EarlyMemberCard } from '../early-member/EarlyMemberCard'
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Home', icon: Home },
@@ -12,7 +13,7 @@ const NAV_ITEMS = [
 ]
 
 export function Sidebar() {
-  const { user, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   
   const [isPro, setIsPro] = useState(true) // default true to avoid flash
@@ -62,6 +63,7 @@ export function Sidebar() {
       top: 0,
       zIndex: 100,
       overflowY: 'auto',
+      overflowX: 'visible',
     }}>
 
       {/* Logo */}
@@ -195,6 +197,11 @@ export function Sidebar() {
             Sol Pro · Active
           </span>
         </div>
+      )}
+
+      {/* Early Member Card */}
+      {profile?.is_early_member && (
+        <EarlyMemberCard profile={profile} />
       )}
 
       {/* Bottom: profile + sign out */}

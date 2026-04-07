@@ -8,6 +8,7 @@ import { api } from '../lib/axios';
 import { AppShell } from '../components/layout/AppShell';
 import { Clock } from 'lucide-react'
 import { UpgradeModal, useUpgradeModal } from '../components/upgrade/UpgradeModal'
+import { DailyWidget } from '../components/dashboard/DailyWidget'
 
 const SUBTEXTS = [
   "Take a slow, deep breath.",
@@ -267,6 +268,11 @@ export default function Dashboard() {
               </p>
               <p className="text-sm text-sol-text-secondary">Last session</p>
             </div>
+          </motion.div>
+
+          {/* Daily Widget */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+            <DailyWidget preferredName={name} onStartSession={() => navigate('/session/new')} />
           </motion.div>
 
           {/* Horizontal Recent Sessions */}
