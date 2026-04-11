@@ -16,7 +16,7 @@ app = FastAPI(title="Sol API", version="1.0.0")
 
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=[settings.frontend_url, "http://localhost:5173", "https://www.talktosol.online", "https://talktosol.online"],
+  allow_origins=[settings.frontend_url, "http://localhost:5173", "https://www.talktosol.online", "https://talktosol.online", "https://sol-4y64.vercel.app"],
   allow_credentials=True,
   allow_methods=["*"],
   allow_headers=["*"],
