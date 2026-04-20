@@ -117,6 +117,16 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      }
+    })
+    if (error) throw error
+  }
+
   const refreshProfile = async () => {
     profileFetchedFor.current = null // force re-fetch
     if (user?.id) await fetchProfile(user.id)
@@ -170,6 +180,7 @@ export function AuthProvider({ children }) {
       signUp,
       signOut,
       sendMagicLink,
+      signInWithGoogle,
       refreshProfile,
     }}>
       {children}
