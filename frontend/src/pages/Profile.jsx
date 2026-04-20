@@ -324,8 +324,6 @@ export default function Profile() {
               </div>
            </section>
 
-           </section>
-
            {feedbackEnabled && (
              <div style={{
                marginTop: 32,
