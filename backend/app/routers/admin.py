@@ -315,3 +315,50 @@ async def mark_payout(
     except Exception as e:
         raise HTTPException(status_code=500,
             detail={"error": True, "message": str(e)})
+
+@router.get("/app-settings")
+async def get_app_settings(admin=Depends(require_admin)):
+    res = supabase.table("app_settings").select("*").execute()
+    return {"settings": {s["key"]: s["value"] for s in (res.data or [])}}
+
+
+@router.patch("/app-settings/{key}")
+async def update_app_setting(
+    key: str, payload: dict, admin=Depends(require_admin)
+):
+    try:
+        from datetime import datetime
+        supabase.table("app_settings").upsert({
+            "key": key,
+            "value": payload.get("value"),
+            "updated_at": datetime.utcnow().isoformat(),
+            "updated_by": admin.email,
+        }, on_conflict="key").execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={
+            "error": True, "message": str(e)
+        })
+
+
+@router.get("/user-feedback")
+async def list_user_feedback(
+    admin=Depends(require_admin),
+    page: int = 1,
+    limit: int = 20
+):
+    try:
+        offset = (page - 1) * limit
+        res = supabase.table("user_feedback")\
+            .select("*, profiles(preferred_name, full_name)")\
+            .order("submitted_at", desc=True)\
+            .range(offset, offset + limit - 1).execute()
+        return {
+            "feedback": res.data or [],
+            "page": page,
+        }
+    except Exception as e:
+        logger.error(f"list_user_feedback failed: {e}")
+        raise HTTPException(status_code=500, detail={
+            "error": True, "message": "Could not fetch feedback."
+        })

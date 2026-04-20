@@ -233,3 +233,73 @@ async def redeem_code(payload: dict, user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"redeem-code failed: {e}")
         raise HTTPException(status_code=500, detail="Could not redeem.")
+
+@router.get("/feedback-status")
+async def get_feedback_status():
+    """Public — checks if feedback form is enabled."""
+    try:
+        res = supabase.table("app_settings")\
+            .select("value")\
+            .eq("key", "feedback_enabled")\
+            .limit(1).execute()
+        enabled = True
+        if res.data:
+            enabled = res.data[0]["value"] == True or \
+                      res.data[0]["value"] == "true"
+        return {"enabled": enabled}
+    except Exception as e:
+        logger.error(f"get_feedback_status failed: {e}")
+        return {"enabled": True}  # fail open
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    payload: dict, user=Depends(get_current_user)
+):
+    try:
+        # Check if feedback is enabled
+        status_res = supabase.table("app_settings")\
+            .select("value").eq("key", "feedback_enabled")\
+            .limit(1).execute()
+        if status_res.data:
+            enabled = status_res.data[0]["value"]
+            if enabled == False or enabled == "false":
+                raise HTTPException(status_code=403, detail={
+                    "error": True,
+                    "message": "Feedback is currently disabled."
+                })
+
+        # Check: user can only submit once per 7 days
+        from datetime import datetime, timedelta
+        seven_days_ago = (
+            datetime.utcnow() - timedelta(days=7)
+        ).isoformat()
+
+        recent = supabase.table("user_feedback")\
+            .select("id")\
+            .eq("user_id", user.id)\
+            .gte("submitted_at", seven_days_ago)\
+            .limit(1).execute()
+
+        if recent.data:
+            raise HTTPException(status_code=429, detail={
+                "error": True,
+                "message": "You've already shared feedback recently. "
+                           "Come back in a few days."
+            })
+
+        supabase.table("user_feedback").insert({
+            "user_id": user.id,
+            "answers": payload.get("answers", {}),
+            "mood_at_time": payload.get("mood_at_time"),
+        }).execute()
+
+        return {"success": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"submit_feedback failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail={
+            "error": True, "message": "Could not save feedback."
+        })

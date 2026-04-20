@@ -2,11 +2,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Home, Clock, Brain, Settings, User, Plus } from 'lucide-react'
 
 const TABS = [
-  { path: '/dashboard', icon: <Home size={22} />, label: 'Home' },
-  { path: '/sessions',  icon: <Clock size={22} />, label: 'Sessions' },
+  { path: '/dashboard',   icon: <Home size={22} />, label: 'Home' },
+  { path: '/sessions',    icon: <Clock size={22} />, label: 'Sessions' },
   { path: '/session/new', icon: <Plus size={26} />, label: 'New', isCenter: true },
-  { path: '/memory',    icon: <Brain size={22} />, label: 'Memory' },
-  { path: '/profile',   icon: <User size={22} />, label: 'Profile' },
+  { path: '/settings',    icon: <Settings size={22} />, label: 'Settings' },
+  { path: '/profile',     icon: <User size={22} />, label: 'Profile' },
 ]
 
 export function MobileTabs() {

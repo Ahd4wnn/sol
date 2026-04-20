@@ -17,6 +17,7 @@ export default function Admin() {
   const [giftPlan, setGiftPlan] = useState('pro_monthly')
   const [giftNote, setGiftNote] = useState('')
   const [loading, setLoading] = useState(true)
+  const [appSettings, setAppSettings] = useState({})
 
   const [creators, setCreators] = useState([])
   const [newCreator, setNewCreator] = useState({
@@ -39,6 +40,11 @@ export default function Admin() {
     setCreators(res.data?.creators || [])
   }
 
+  const loadAppSettings = async () => {
+    const res = await api.get('/api/admin/app-settings').catch(e => ({ data: { settings: {} } }))
+    setAppSettings(res.data?.settings || {})
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
@@ -53,6 +59,7 @@ export default function Admin() {
       setFeedback(feedbackRes.data?.feedback || [])
       setCodes(codesRes.data?.codes || [])
       await loadCreators()
+      await loadAppSettings()
     } catch (err) {
       console.error('Admin load failed:', err)
       if (err.response?.status === 403) navigate('/dashboard')
@@ -287,10 +294,65 @@ export default function Admin() {
         {/* FEEDBACK TAB */}
         {activeTab === 'feedback' && (
           <div>
-            <h2 style={{ fontFamily: 'Fraunces, serif', fontWeight: 300,
-                        fontSize: 28, marginBottom: 24 }}>
-              Unresolved Feedback ({feedback.length})
-            </h2>
+            {/* ── TOGGLE ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px 24px',
+              background: 'white',
+              borderRadius: 16,
+              border: '1px solid #E8E3DD',
+              marginBottom: 24,
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15, color: '#1A1714' }}>
+                  User Feedback Section
+                </div>
+                <div style={{ fontSize: 13, color: '#9E8E7E', marginTop: 2 }}>
+                  Show or hide the feedback form in users' Profile pages
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  const current = appSettings['feedback_enabled']
+                  const newVal = current === false ? true : false
+                  await api.patch('/api/admin/app-settings/feedback_enabled',
+                    { value: newVal })
+                  setAppSettings(prev => ({
+                    ...prev, feedback_enabled: newVal
+                  }))
+                }}
+                style={{
+                  width: 52, height: 28,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: appSettings['feedback_enabled'] === false
+                    ? '#E8E3DD' : '#C96B2E',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background 200ms',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 4,
+                  left: appSettings['feedback_enabled'] === false ? 4 : 24,
+                  width: 20, height: 20,
+                  borderRadius: '50%',
+                  background: 'white',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  transition: 'left 200ms ease',
+                }} />
+              </button>
+            </div>
+
+            {/* ── SOL CHAT FEEDBACK (existing) ── */}
+            <h3 style={{
+              fontFamily: 'Fraunces, serif', fontWeight: 300,
+              fontSize: 20, marginBottom: 16, color: '#1A1714',
+            }}>In-Chat Feedback</h3>
+            
             {feedback.length === 0 ? (
               <p style={{ color: '#9E8E7E' }}>No unresolved feedback. 🎉</p>
             ) : (
@@ -337,6 +399,14 @@ export default function Admin() {
                 ))}
               </div>
             )}
+
+            {/* ── USER PROFILE FEEDBACK ── */}
+            <h3 style={{
+              fontFamily: 'Fraunces, serif', fontWeight: 300,
+              fontSize: 20, margin: '32px 0 16px', color: '#1A1714',
+            }}>User Feedback Submissions</h3>
+
+            <UserFeedbackList />
           </div>
         )}
 
@@ -718,6 +788,133 @@ export default function Admin() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function UserFeedbackList() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(null)
+
+  useEffect(() => {
+    api.get('/api/admin/user-feedback')
+      .then(r => setItems(r.data.feedback || []))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const QUESTION_LABELS = {
+    q1: "What stuck with them",
+    q2: "What Sol gets wrong",
+    q3: "What they're looking for",
+    q4: "What would make them open Sol daily",
+    q5: "Favourite archetype",
+    q6: "What Sol can't help with yet",
+    q7: "What they'd miss",
+    q8: "Trust level (1-5)",
+    q9: "What they'd tell a friend",
+    q10: "What we should have asked",
+  }
+
+  if (loading) return (
+    <div style={{ padding: 24, color: '#9E8E7E', fontSize: 14 }}>
+      Loading...
+    </div>
+  )
+
+  if (!items.length) return (
+    <div style={{
+      padding: 24, textAlign: 'center',
+      color: '#9E8E7E', fontSize: 14,
+    }}>
+      No user feedback yet. Enable the form and share the word. ☀️
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {items.map((item, i) => (
+        <div key={item.id} style={{
+          background: 'white',
+          borderRadius: 14,
+          border: '1px solid #E8E3DD',
+          overflow: 'hidden',
+        }}>
+          {/* Row header */}
+          <div
+            onClick={() => setExpanded(expanded === i ? null : i)}
+            style={{
+              padding: '14px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: '#F0EBE5',
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'DM Sans, sans-serif',
+                fontWeight: 600, fontSize: 13, color: '#C96B2E',
+              }}>
+                {(item.profiles?.preferred_name ||
+                  item.profiles?.full_name || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500,
+                             color: '#1A1714' }}>
+                  {item.profiles?.preferred_name ||
+                   item.profiles?.full_name || 'Anonymous'}
+                </div>
+                <div style={{ fontSize: 12, color: '#9E8E7E' }}>
+                  {new Date(item.submitted_at).toLocaleDateString()} ·
+                  feeling {item.mood_at_time || 'unknown'}
+                </div>
+              </div>
+            </div>
+            <span style={{
+              fontSize: 14, color: '#9E8E7E',
+              transform: expanded === i ? 'rotate(180deg)' : 'rotate(0)',
+              transition: 'transform 200ms',
+              display: 'inline-block',
+            }}>▾</span>
+          </div>
+
+          {/* Expanded answers */}
+          {expanded === i && (
+            <div style={{
+              borderTop: '1px solid #F0EBE5',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}>
+              {Object.entries(item.answers || {}).map(([key, val]) => (
+                val ? (
+                  <div key={key}>
+                    <div style={{
+                      fontSize: 11, fontWeight: 700, color: '#C96B2E',
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      marginBottom: 4,
+                    }}>
+                      {QUESTION_LABELS[key] || key}
+                    </div>
+                    <div style={{
+                      fontSize: 14, color: '#1A1714', lineHeight: 1.6,
+                    }}>
+                      {typeof val === 'number' ? `${val} / 5` : val}
+                    </div>
+                  </div>
+                ) : null
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
