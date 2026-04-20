@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
@@ -19,6 +20,10 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('therapist');
   const [intakeData, setIntakeData] = useState(null);
+  const navigate = useNavigate();
+  const [billingStatus, setBillingStatus] = useState(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const isPro = billingStatus?.is_pro || profile?.is_early_member || false;
   
   const { permission, subscribed, subscribe, unsubscribe } = usePushNotifications();
 
@@ -40,6 +45,8 @@ export default function Settings() {
     if (profile?.intake_responses) {
       setIntakeData(profile.intake_responses);
     }
+
+    api.get('/api/billing/status').then(r => setBillingStatus(r.data)).catch(() => {});
   }, [profile]);
 
   const saveTherapistSettings = async () => {
@@ -52,6 +59,25 @@ export default function Settings() {
       addToast('Failed to update preferences.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateTherapistSetting = async (key, value) => {
+    try {
+      setShowUpgradePrompt(false);
+      const newSettings = { ...tSettings, [key]: value };
+      setTSettings(newSettings);
+      await api.patch('/api/profile/therapist-settings', newSettings);
+      await refreshProfile();
+    } catch (err) {
+      const code = err.response?.data?.detail?.code;
+      if (code === 'PRO_REQUIRED') {
+        setTSettings(prev => ({ ...prev, [key]: tSettings[key] }));
+        setShowUpgradePrompt(true);
+        return;
+      }
+      addToast('Failed to save therapist setting.', 'error');
+      console.error('Failed to save therapist setting:', err);
     }
   };
 
@@ -99,11 +125,45 @@ export default function Settings() {
              <section className="space-y-8 animate-fade-in">
                 <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-6">
                    <div>
-                     <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Sol Persona</label>
+                     <div style={{ marginBottom: 10 }}>
+                        <label className="block font-semibold text-sol-text-primary" style={{ fontSize: 15 }}>Choose your Sol.</label>
+                        <p className="text-sol-text-secondary" style={{ fontSize: 13, marginTop: 4, lineHeight: 1.5, opacity: 0.8 }}>Each one is a different way of thinking.<br/>Not a different person — a different lens.</p>
+                      </div>
                      <TherapistPicker
                        value={tSettings.therapist_tone}
-                       onChange={(tone) => setTSettings({...tSettings, therapist_tone: tone})}
+                       onChange={(tone) => updateTherapistSetting('therapist_tone', tone)}
+                       isPro={isPro}
                      />
+                     {showUpgradePrompt && (
+                       <div style={{
+                         padding: '14px 18px',
+                         borderRadius: 14,
+                         background: 'rgba(201,107,46,0.06)',
+                         border: '1px solid rgba(201,107,46,0.2)',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'space-between',
+                         gap: 16,
+                         marginTop: 12,
+                         flexWrap: 'wrap',
+                       }}>
+                         <div>
+                           <div style={{ fontSize: 14, fontWeight: 500, color: '#1A1714' }}>
+                             Apex, Crest, Forge & Vale are Pro-only
+                           </div>
+                           <div style={{ fontSize: 13, color: '#9E8E7E', marginTop: 2 }}>
+                             Upgrade to unlock all 8 archetypes
+                           </div>
+                         </div>
+                         <button
+                           onClick={() => navigate('/upgrade')}
+                           className="btn-mesh"
+                           style={{ padding: '9px 18px', fontSize: 13, flexShrink: 0 }}
+                         >
+                           Upgrade →
+                         </button>
+                       </div>
+                     )}
                    </div>
                    
                    <div>

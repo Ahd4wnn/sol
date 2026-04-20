@@ -219,12 +219,29 @@ export function Sidebar() {
             marginBottom: 4,
           })}
         >
+          {profile?.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={displayName}
+              style={{
+                width: 32, height: 32,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                flexShrink: 0,
+                border: '2px solid #E8E3DD',
+              }}
+              onError={(e) => {
+                e.target.style.display = 'none'
+                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'
+              }}
+            />
+          ) : null}
           <div style={{
             width: 32,
             height: 32,
             borderRadius: '50%',
             background: '#E8E3DD',
-            display: 'flex',
+            display: profile?.avatar_url ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontFamily: 'DM Sans, sans-serif',

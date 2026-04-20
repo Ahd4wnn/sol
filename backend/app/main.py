@@ -3,7 +3,7 @@ import time
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import auth, sessions, profile, agent, memory, messages, admin, billing, push, notifications
+from app.routers import auth, sessions, profile, agent, memory, messages, admin, billing, push, notifications, creators
 from app.services.supabase_client import supabase
 
 logging.basicConfig(
@@ -16,7 +16,13 @@ app = FastAPI(title="Sol API", version="1.0.0")
 
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=[settings.frontend_url, "http://localhost:5173", "https://www.talktosol.online", "https://talktosol.online", "https://sol-4y64.vercel.app"],
+  allow_origins=[
+      settings.frontend_url, 
+      "http://localhost:5173", 
+      "https://www.talktosol.online", 
+      "https://talktosol.online",
+      "https://sol-4y64.vercel.app"
+  ],
   allow_credentials=True,
   allow_methods=["*"],
   allow_headers=["*"],
@@ -48,6 +54,7 @@ api_router.include_router(admin.router)
 api_router.include_router(billing.router)
 api_router.include_router(push.router)
 api_router.include_router(notifications.router)
+api_router.include_router(creators.router)
 
 app.include_router(api_router)
 

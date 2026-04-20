@@ -1,17 +1,32 @@
+import { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import TypingIndicator from './TypingIndicator';
 
+// Track which message IDs have already been rendered across the app lifetime
+const seenMessageIds = new Set();
+
 export default function MessageBubble({ role, content, isStreaming, timestamp }) {
   const isUser = role === 'user';
+  const idRef = useRef(null);
   
-  const timeString = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  // Determine if this is the first time this message is rendered
+  const msgKey = `${role}-${timestamp}-${content?.slice(0, 20)}`;
+  const isNew = !seenMessageIds.has(msgKey);
+  
+  useEffect(() => {
+    // Mark as seen after first render (small delay so animation plays)
+    if (isNew && !isStreaming) {
+      seenMessageIds.add(msgKey);
+    }
+  }, [msgKey, isNew, isStreaming]);
 
+  // While streaming and no content yet — show typing dots
   if (role === 'assistant' && isStreaming && !content) {
     return (
       <motion.div 
-        initial={{ opacity: 0, y: 12, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.18 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15 }}
         className="flex justify-start items-end gap-3 mb-6"
       >
         <div className="flex-none w-8 h-8 rounded-full bg-sol-primary flex items-center justify-center text-white font-display italic text-sm shadow-sm">
@@ -22,13 +37,24 @@ export default function MessageBubble({ role, content, isStreaming, timestamp })
     );
   }
 
+  const timeString = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
   const isCrisisSupport = !isUser && content?.includes('Sol wants you to know:');
+
+  // Only animate entrance for truly new messages, not on re-renders
+  const animationProps = isNew
+    ? {
+        initial: { opacity: 0, y: 10 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.18 },
+      }
+    : {
+        initial: false,
+        animate: { opacity: 1, y: 0 },
+      };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.18 }}
+      {...animationProps}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-end gap-3 mb-6 group w-full`}
     >
       {!isUser && (

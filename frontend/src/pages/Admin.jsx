@@ -18,11 +18,26 @@ export default function Admin() {
   const [giftNote, setGiftNote] = useState('')
   const [loading, setLoading] = useState(true)
 
+  const [creators, setCreators] = useState([])
+  const [newCreator, setNewCreator] = useState({
+    name: '', email: '', handle: '',
+    promo_code: '', ref_slug: '',
+    commission_rate: 30, user_discount: 20,
+    bonus_messages: 10, password: '', payout_info: ''
+  })
+  const [showNewCreatorForm, setShowNewCreatorForm] = useState(false)
+  const [selectedCreator, setSelectedCreator] = useState(null)
+
   useEffect(() => {
     if (!profile) return
     // We check against the profile's email (if we had it), or we just let it fetch and fail if not admin
     loadData()
   }, [profile])
+
+  const loadCreators = async () => {
+    const res = await api.get('/api/admin/creators').catch(e => ({ data: { creators: [] } }))
+    setCreators(res.data?.creators || [])
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -37,6 +52,7 @@ export default function Admin() {
       setUsers(usersRes.data?.users || [])
       setFeedback(feedbackRes.data?.feedback || [])
       setCodes(codesRes.data?.codes || [])
+      await loadCreators()
     } catch (err) {
       console.error('Admin load failed:', err)
       if (err.response?.status === 403) navigate('/dashboard')
@@ -89,7 +105,7 @@ export default function Admin() {
     </div>
   )
 
-  const TABS = ['overview', 'users', 'feedback', 'gift', 'codes']
+  const TABS = ['overview', 'users', 'feedback', 'gift', 'codes', 'creators']
 
   return (
     <div style={{ minHeight: '100vh', background: '#F9F7F4',
@@ -480,6 +496,225 @@ export default function Admin() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* CREATORS TAB */}
+        {activeTab === 'creators' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center',
+                         justifyContent: 'space-between', marginBottom: 24 }}>
+              <h2 style={{ fontFamily: 'Fraunces, serif', fontWeight: 300,
+                          fontSize: 28 }}>Creators ({creators.length})</h2>
+              <button
+                onClick={() => setShowNewCreatorForm(true)}
+                className="btn-mesh"
+                style={{ padding: '10px 20px', fontSize: 13 }}
+              >+ Add Creator</button>
+            </div>
+
+            {/* New creator form */}
+            {showNewCreatorForm && (
+              <div style={{
+                background: 'white', borderRadius: 16,
+                border: '1px solid #E8E3DD', padding: 24,
+                marginBottom: 24,
+              }}>
+                <h3 style={{ marginBottom: 20, fontWeight: 500 }}>New Creator</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr',
+                             gap: 12 }}>
+                  {[
+                    { key: 'name', label: 'Full Name', placeholder: 'Alex Creator' },
+                    { key: 'email', label: 'Email', placeholder: 'alex@gmail.com' },
+                    { key: 'handle', label: 'Social Handle', placeholder: '@alexcreates' },
+                    { key: 'password', label: 'Password (for dashboard login)', placeholder: '••••••••', type: 'password' },
+                    { key: 'promo_code', label: 'Promo Code', placeholder: 'ALEX20' },
+                    { key: 'ref_slug', label: 'Ref Slug', placeholder: 'alex' },
+                    { key: 'commission_rate', label: 'Commission %', placeholder: '30' },
+                    { key: 'user_discount', label: 'User Discount %', placeholder: '20' },
+                    { key: 'bonus_messages', label: 'Bonus Messages', placeholder: '10' },
+                  ].map(field => (
+                    <div key={field.key}>
+                      <label style={{ fontSize: 12, color: '#9E8E7E', display: 'block',
+                                     marginBottom: 4 }}>{field.label}</label>
+                      <input
+                        type={field.type || 'text'}
+                        placeholder={field.placeholder}
+                        value={newCreator[field.key]}
+                        onChange={e => setNewCreator(prev => ({
+                          ...prev, [field.key]: e.target.value
+                        }))}
+                        style={{
+                          width: '100%', padding: '10px 12px',
+                          border: '1px solid #E8E3DD', borderRadius: 10,
+                          fontFamily: 'DM Sans, sans-serif', fontSize: 14,
+                          outline: 'none', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={{ fontSize: 12, color: '#9E8E7E', display: 'block',
+                                   marginBottom: 4 }}>Payout Info (bank/UPI)</label>
+                    <textarea
+                      placeholder="UPI: alex@upi or Bank: HDFC XXXX..."
+                      value={newCreator.payout_info}
+                      onChange={e => setNewCreator(prev => ({
+                        ...prev, payout_info: e.target.value
+                      }))}
+                      style={{
+                        width: '100%', padding: '10px 12px',
+                        border: '1px solid #E8E3DD', borderRadius: 10,
+                        fontFamily: 'DM Sans, sans-serif', fontSize: 14,
+                        outline: 'none', resize: 'none', minHeight: 70,
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.post('/api/admin/creators', newCreator)
+                        setShowNewCreatorForm(false)
+                        setNewCreator({
+                          name: '', email: '', handle: '',
+                          promo_code: '', ref_slug: '',
+                          commission_rate: 30, user_discount: 20,
+                          bonus_messages: 10, password: '', payout_info: ''
+                        })
+                        loadCreators()
+                        alert('Creator added!')
+                      } catch(e) {
+                        alert('Error: ' + (e.response?.data?.detail?.message || e.message))
+                      }
+                    }}
+                    className="btn-mesh"
+                    style={{ padding: '10px 24px', fontSize: 14 }}
+                  >Create Creator</button>
+                  <button
+                    onClick={() => setShowNewCreatorForm(false)}
+                    style={{ padding: '10px 20px', background: 'none',
+                            border: '1px solid #E8E3DD', borderRadius: 999,
+                            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                            fontSize: 14 }}
+                  >Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Creator cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {creators.map(creator => (
+                <div key={creator.id} style={{
+                  background: 'white', borderRadius: 16,
+                  border: '1px solid #E8E3DD', padding: '20px 24px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start',
+                               justifyContent: 'space-between', flexWrap: 'wrap',
+                               gap: 16 }}>
+                    {/* Left info */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10,
+                                   marginBottom: 6 }}>
+                        <div style={{ fontWeight: 600, fontSize: 16,
+                                     color: '#1A1714' }}>{creator.name}</div>
+                        <span style={{ fontSize: 13, color: '#9E8E7E' }}>
+                          {creator.handle}
+                        </span>
+                        <span style={{
+                          padding: '2px 10px', borderRadius: 999, fontSize: 11,
+                          fontWeight: 600,
+                          background: creator.status === 'active'
+                            ? '#E8F5EF' : '#FEE8E8',
+                          color: creator.status === 'active' ? '#3D7A5F' : '#C0392B',
+                        }}>{creator.status}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 20, fontSize: 13,
+                                   color: '#6B6560', flexWrap: 'wrap' }}>
+                        <span>Code: <strong>{creator.promo_code}</strong></span>
+                        <span>Link: <strong>?ref={creator.ref_slug}</strong></span>
+                        <span>Commission: <strong>{creator.commission_rate}%</strong></span>
+                        <span>User discount: <strong>{creator.user_discount}%</strong></span>
+                      </div>
+                      {creator.payout_info && (
+                        <div style={{ fontSize: 12, color: '#9E8E7E', marginTop: 6 }}>
+                          💳 {creator.payout_info}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right — earnings */}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 24, fontFamily: 'Fraunces, serif',
+                                   fontWeight: 300, color: '#C96B2E' }}>
+                        ${(creator.total_earnings || 0).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#9E8E7E' }}>total earned</div>
+                      <div style={{ fontSize: 13, color: '#3D7A5F', marginTop: 2 }}>
+                        ${((creator.total_earnings || 0) -
+                           (creator.total_paid || 0)).toFixed(2)} pending
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16,
+                               borderTop: '1px solid #F0EBE5', paddingTop: 14 }}>
+                    <button
+                      onClick={async () => {
+                        const amount = (creator.total_earnings || 0) -
+                                       (creator.total_paid || 0)
+                        if (amount <= 0) return alert('Nothing to pay out.')
+                        const notes = prompt(`Paying $${amount.toFixed(2)} to ${creator.name}. Add a note (optional):`)
+                        if (notes === null) return
+                        await api.post(`/api/admin/creators/${creator.id}/payout`,
+                          { amount, notes })
+                        loadCreators()
+                        alert(`Payout of $${amount.toFixed(2)} marked as paid!`)
+                      }}
+                      style={{
+                        padding: '7px 16px', borderRadius: 8,
+                        background: '#E8F5EF', color: '#3D7A5F',
+                        border: 'none', cursor: 'pointer', fontSize: 13,
+                        fontFamily: 'DM Sans, sans-serif', fontWeight: 500,
+                      }}
+                    >Mark Paid 💸</button>
+
+                    <button
+                      onClick={async () => {
+                        const newStatus = creator.status === 'active' ? 'paused' : 'active'
+                        await api.patch(`/api/admin/creators/${creator.id}`,
+                          { status: newStatus })
+                        loadCreators()
+                      }}
+                      style={{
+                        padding: '7px 16px', borderRadius: 8,
+                        background: '#F0EBE5', color: '#9E8E7E',
+                        border: 'none', cursor: 'pointer', fontSize: 13,
+                        fontFamily: 'DM Sans, sans-serif',
+                      }}
+                    >{creator.status === 'active' ? 'Pause' : 'Activate'}</button>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}?ref=${creator.ref_slug}`
+                        )
+                        alert('Referral link copied!')
+                      }}
+                      style={{
+                        padding: '7px 16px', borderRadius: 8,
+                        background: '#F9F7F4', color: '#6B6560',
+                        border: '1px solid #E8E3DD', cursor: 'pointer',
+                        fontSize: 13, fontFamily: 'DM Sans, sans-serif',
+                      }}
+                    >Copy Link 🔗</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

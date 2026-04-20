@@ -52,6 +52,21 @@ export default function Session() {
     }
   };
 
+  // Lock AppShell's scrollable <main> so the Session manages its own scroll
+  useEffect(() => {
+    const appShellMain = document.querySelector('main');
+    if (appShellMain) {
+      const prevOverflow = appShellMain.style.overflow;
+      const prevPadding = appShellMain.style.paddingBottom;
+      appShellMain.style.overflow = 'hidden';
+      appShellMain.style.paddingBottom = '0';
+      return () => {
+        appShellMain.style.overflow = prevOverflow;
+        appShellMain.style.paddingBottom = prevPadding;
+      };
+    }
+  }, []);
+
   useEffect(() => {
     api.get('/api/billing/status').then(r => setBillingStatus(r.data)).catch(console.error);
   }, []);
@@ -158,10 +173,10 @@ export default function Session() {
 
   return (
     <AppShell>
-      <div className="h-[calc(100vh-80px)] md:h-screen flex flex-col relative">
+      <div className="h-[calc(100vh-80px)] md:h-screen flex flex-col overflow-hidden">
 
         {/* Top Bar */}
-        <header className="flex-none h-16 bg-white/80 backdrop-blur-md border-b border-sol-border px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 w-full">
+        <header className="flex-none h-16 bg-white/80 backdrop-blur-md border-b border-sol-border px-4 md:px-8 flex items-center justify-between z-10 w-full shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/dashboard')}
@@ -226,13 +241,13 @@ export default function Session() {
             )}
 
             <div className="flex flex-col w-full gap-1">
-              {dbMessages.map((msg) => (
+              {dbMessages.map((msg, idx) => (
                 <MessageBubble
                   key={msg.id}
                   role={msg.role}
                   content={msg.content}
                   timestamp={msg.created_at}
-                  isStreaming={isStreaming && String(msg.id).startsWith('temp-a')}
+                  isStreaming={isStreaming && idx === dbMessages.length - 1 && msg.role === 'assistant'}
                 />
               ))}
               <div ref={bottomRef} className="h-4 w-full" />

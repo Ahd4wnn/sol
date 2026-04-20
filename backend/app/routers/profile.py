@@ -120,10 +120,39 @@ async def update_profile(payload: dict, user=Depends(get_current_user)):
             detail={"error": True, "message": "Could not update profile"}
         )
 
+PRO_ONLY_TONES = [
+  "Like a competitor",
+  "Like an obsessive",
+  "Like a builder",
+  "Like an anchor",
+]
+
 @router.patch("/therapist-settings")
-def update_therapist_settings(payload: UpdateTherapistSettingsRequest, user=Depends(get_current_user)):
-    # Merge existing settings if present
+async def update_therapist_settings(payload: UpdateTherapistSettingsRequest, user=Depends(get_current_user)):
     try:
+        requested_tone = payload.therapist_tone
+
+        if requested_tone in PRO_ONLY_TONES:
+            # Check if user is Pro or Early Member
+            profile_res = supabase.table("profiles")\
+                .select("is_early_member")\
+                .eq("id", user.id).limit(1).execute()
+            is_early = profile_res.data[0].get("is_early_member", False) if (hasattr(profile_res, 'data') and len(profile_res.data) > 0) else False
+
+            from app.services.subscription_service import is_pro
+            user_is_pro = await is_pro(user.id)
+
+            if not user_is_pro and not is_early:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": True,
+                        "message": "This archetype is available for Pro members.",
+                        "code": "PRO_REQUIRED"
+                    }
+                )
+
+        # Merge existing settings if present
         profile_res = supabase.table("profiles").select("therapist_settings").eq("id", user.id).limit(1).execute()
         existing_settings = profile_res.data[0].get("therapist_settings") if hasattr(profile_res, 'data') and len(profile_res.data) > 0 else {}
         if existing_settings is None: existing_settings = {}
@@ -133,6 +162,8 @@ def update_therapist_settings(payload: UpdateTherapistSettingsRequest, user=Depe
         
         supabase.table("profiles").update({"therapist_settings": merged}).eq("id", user.id).execute()
         return {"status": "success", "therapist_settings": merged}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"update_therapist_settings failed for user {user.id}: {e}")
         raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})

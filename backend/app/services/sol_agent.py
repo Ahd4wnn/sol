@@ -202,13 +202,13 @@ async def stream_sol_response(system_prompt: str, messages: list, agent_context:
             model_provider=OpenAIProvider(openai_client=openai_client)
         )
 
-        async with Runner.run_streamed(
+        stream = Runner.run_streamed(
             agent,
             input=user_input,
             context=agent_context,
             run_config=run_config,
-        ) as stream:
-            async for event in stream.stream_events():
+        )
+        async for event in stream.stream_events():
                 if isinstance(event, RawResponsesStreamEvent):
                     data = event.data
                     if isinstance(data, ResponseTextDeltaEvent):

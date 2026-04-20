@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+
 const CHARACTERS = [
   {
     id: 'warm_friend',
@@ -5,18 +7,8 @@ const CHARACTERS = [
     role: 'The Warm Friend',
     behaviour: 'Casual, empathetic, uses your language. Feels like texting your most understanding friend.',
     tone: 'Like a warm friend',
-    color: '#E8874A',
-    emoji: '🧡',
-    avatar: (color) => (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-        <circle cx="28" cy="20" r="11" fill={color} opacity="0.9"/>
-        <ellipse cx="28" cy="11" rx="11" ry="5" fill={color}/>
-        <path d="M12 52 Q12 38 28 38 Q44 38 44 52" fill={color} opacity="0.7"/>
-        <path d="M23 22 Q28 27 33 22" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
-        <circle cx="24" cy="19" r="1.5" fill="white"/>
-        <circle cx="32" cy="19" r="1.5" fill="white"/>
-      </svg>
-    )
+    color: '#C96B2E',
+    tier: 'free',
   },
   {
     id: 'wise_guide',
@@ -25,36 +17,16 @@ const CHARACTERS = [
     behaviour: 'Structured, insight-focused, helps you understand your own patterns and why you feel what you feel.',
     tone: 'Like a thoughtful guide',
     color: '#3D7A5F',
-    emoji: '💚',
-    avatar: (color) => (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-        <circle cx="28" cy="20" r="11" fill={color} opacity="0.9"/>
-        <rect x="19" y="18" width="7" height="5" rx="2.5" stroke="white" strokeWidth="1.5" fill="none"/>
-        <rect x="30" y="18" width="7" height="5" rx="2.5" stroke="white" strokeWidth="1.5" fill="none"/>
-        <line x1="26" y1="20.5" x2="30" y2="20.5" stroke="white" strokeWidth="1.5"/>
-        <path d="M12 52 Q12 38 28 38 Q44 38 44 52" fill={color} opacity="0.7"/>
-        <path d="M24 24 Q28 26 32 24" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      </svg>
-    )
+    tier: 'free',
   },
   {
     id: 'coach',
     name: 'Alex',
-    role: 'The Coach',
-    behaviour: 'Direct, action-oriented, keeps you accountable. Less feelings, more momentum.',
+    role: 'The Relationship Expert',
+    behaviour: 'Knows exactly why your love life is the way it is. Direct, warm, and brutally honest about patterns you keep repeating.',
     tone: 'Like a coach',
     color: '#C96B2E',
-    emoji: '🔥',
-    avatar: (color) => (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-        <circle cx="28" cy="20" r="11" fill={color} opacity="0.9"/>
-        <path d="M17 17 Q17 9 28 9 Q39 9 39 17" fill={color}/>
-        <path d="M10 52 Q10 36 28 36 Q46 36 46 52" fill={color} opacity="0.7"/>
-        <line x1="23" y1="24" x2="33" y2="24" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-        <circle cx="24" cy="19" r="1.5" fill="white"/>
-        <circle cx="32" cy="19" r="1.5" fill="white"/>
-      </svg>
-    )
+    tier: 'free',
   },
   {
     id: 'mentor',
@@ -63,133 +35,278 @@ const CHARACTERS = [
     behaviour: 'Reflective, philosophical, patient. Will sit in the hard questions with you without rushing to answers.',
     tone: 'Like a wise mentor',
     color: '#7B5EA7',
-    emoji: '✨',
-    avatar: (color) => (
-      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-        <circle cx="28" cy="20" r="11" fill={color} opacity="0.9"/>
-        <path d="M17 14 Q14 30 16 42" stroke={color} strokeWidth="6" strokeLinecap="round" fill="none"/>
-        <path d="M39 14 Q42 30 40 42" stroke={color} strokeWidth="6" strokeLinecap="round" fill="none"/>
-        <path d="M12 52 Q12 38 28 38 Q44 38 44 52" fill={color} opacity="0.7"/>
-        <path d="M23 23 Q28 27 33 23" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-        <path d="M22 19 Q24 17 26 19" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-        <path d="M30 19 Q32 17 34 19" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-      </svg>
-    )
-  }
+    tier: 'free',
+  },
+  {
+    id: 'apex',
+    name: 'Apex',
+    role: 'The Competitor',
+    behaviour: 'Zero noise. Every word lands. Turns excuses into action and spirals into focus.',
+    tone: 'Like a competitor',
+    color: '#1A1A2E',
+    accentColor: '#4A90D9',
+    tier: 'pro',
+  },
+  {
+    id: 'crest',
+    name: 'Crest',
+    role: 'The Obsessive',
+    behaviour: 'Self-belief as a weapon. Turns every setback into fuel. Helps you build the identity of someone who does not quit.',
+    tone: 'Like an obsessive',
+    color: '#1A3A2A',
+    accentColor: '#2ECC71',
+    tier: 'pro',
+  },
+  {
+    id: 'forge',
+    name: 'Forge',
+    role: 'The Builder',
+    behaviour: 'Treats your problems like engineering puzzles. Sharp, witty, occasionally sarcastic. Makes complexity feel solvable.',
+    tone: 'Like a builder',
+    color: '#2A1A0A',
+    accentColor: '#E8A020',
+    tier: 'pro',
+  },
+  {
+    id: 'vale',
+    name: 'Vale',
+    role: 'The Anchor',
+    behaviour: 'Steady as gravity. Helps you find your moral ground when everything feels uncertain. Strength that comes from values, not ego.',
+    tone: 'Like an anchor',
+    color: '#0A1A2A',
+    accentColor: '#5B9BD5',
+    tier: 'pro',
+  },
 ]
 
-export function TherapistPicker({ value, onChange }) {
+function PersonaImage({ id, name, color, isSelected }) {
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(false)
+
+  if (error) {
+    // Fallback: show initial letter
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `rgba(${hexToRgb(color)}, 0.15)`,
+        fontFamily: 'Fraunces, serif',
+        fontStyle: 'italic',
+        fontSize: 18,
+        color: color,
+        fontWeight: 300,
+      }}>
+        {name[0]}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {!loaded && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `linear-gradient(
+            90deg,
+            rgba(${hexToRgb(color)}, 0.08) 25%,
+            rgba(${hexToRgb(color)}, 0.15) 50%,
+            rgba(${hexToRgb(color)}, 0.08) 75%
+          )`,
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s infinite',
+          borderRadius: '50%',
+        }} />
+      )}
+      <img
+        src={`/personas/${name.toLowerCase()}.jpg`}
+        alt={name}
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center top',
+          display: loaded ? 'block' : 'none',
+          transition: 'transform 300ms ease',
+          transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+        }}
+      />
+    </>
+  )
+}
+
+export function TherapistPicker({ value, onChange, isPro }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: 12,
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: 10,
     }}>
-      {CHARACTERS.map(char => {
-        const isSelected = value === char.tone
-        return (
-          <button
-            key={char.id}
-            onClick={() => onChange(char.tone)}
-            style={{
-              padding: '20px 16px',
-              borderRadius: 20,
-              border: `2px solid ${isSelected ? char.color : '#E8E3DD'}`,
-              background: isSelected
-                ? `rgba(${hexToRgb(char.color)}, 0.08)`
-                : 'rgba(255,252,248,0.7)',
-              backdropFilter: 'blur(12px)',
-              cursor: 'pointer',
-              textAlign: 'center',
-              transition: 'all 180ms ease',
-              transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-              boxShadow: isSelected
-                ? `0 4px 20px rgba(${hexToRgb(char.color)}, 0.2)`
-                : 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            {/* Avatar */}
-            <div style={{
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              background: `rgba(${hexToRgb(char.color)}, 0.12)`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: isSelected ? `2px solid ${char.color}` : '2px solid transparent',
-              transition: 'border 180ms',
-            }}>
-              {char.avatar(char.color)}
-            </div>
+      <style>{`
+        @media (max-width: 340px) {
+          .tpicker-grid { grid-template-columns: 1fr !important; }
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+      <div className="tpicker-grid" style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: 10,
+        gridColumn: '1 / -1'
+      }}>
+        {CHARACTERS.map(char => {
+          const isSelected = value === char.tone
+          const isLocked = char.tier === 'pro' && !isPro
 
-            {/* Name */}
-            <div style={{
-              fontFamily: 'Fraunces, serif',
-              fontStyle: 'italic',
-              fontSize: 18,
-              fontWeight: 300,
-              color: isSelected ? char.color : '#1A1714',
-              transition: 'color 180ms',
-            }}>
-              {char.name}
-            </div>
-
-            {/* Role */}
-            <div style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 11,
-              fontWeight: 600,
-              color: isSelected ? char.color : '#9E8E7E',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              transition: 'color 180ms',
-            }}>
-              {char.role}
-            </div>
-
-            {/* Behaviour */}
-            <div style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: 12,
-              color: '#6B6560',
-              lineHeight: 1.5,
-              textAlign: 'center',
-            }}>
-              {char.behaviour}
-            </div>
-
-            {/* Selected indicator */}
-            {isSelected && (
-              <div style={{
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                background: char.color,
+          return (
+            <button
+              key={char.id}
+              onClick={() => !isLocked && onChange(char.tone)}
+              style={{
+                padding: '16px 18px',
+                borderRadius: 14,
+                border: `1.5px solid ${isSelected
+                  ? (char.accentColor || char.color)
+                  : '#E8E3DD'}`,
+                background: isSelected
+                  ? `rgba(${hexToRgb(char.accentColor || char.color)}, 0.08)`
+                  : 'rgba(255,252,248,0.8)',
+                backdropFilter: 'blur(12px)',
+                cursor: isLocked ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 11,
-                fontWeight: 700,
-                marginTop: 4,
-              }}>✓</div>
-            )}
-          </button>
+                gap: 12,
+                textAlign: 'left',
+                transition: 'all 180ms ease',
+                transform: isSelected ? 'scale(1.01)' : 'scale(1)',
+                opacity: isLocked ? 0.6 : 1,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Portrait image with fallback */}
+              <div style={{
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: isSelected
+                  ? `2.5px solid ${char.accentColor || char.color}`
+                  : '2.5px solid transparent',
+                flexShrink: 0,
+                transition: 'border-color 200ms ease',
+                background: `rgba(${hexToRgb(char.accentColor || char.color)}, 0.1)`,
+                position: 'relative',
+                boxShadow: isSelected
+                  ? `0 0 0 3px rgba(${hexToRgb(char.accentColor || char.color)}, 0.25)`
+                  : 'none',
+              }}>
+                <PersonaImage
+                  id={char.id}
+                  name={char.name}
+                  color={char.accentColor || char.color}
+                  isSelected={isSelected}
+                />
+              </div>
+
+              {/* Text */}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                  fontFamily: 'Fraunces, serif',
+                  fontStyle: 'italic',
+                  fontSize: 16,
+                  fontWeight: 300,
+                  color: isSelected
+                    ? (char.accentColor || char.color)
+                    : '#1A1714',
+                  transition: 'color 180ms',
+                  marginBottom: 2,
+                }}>{char.name}</div>
+                <div style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: isSelected
+                    ? (char.accentColor || char.color)
+                    : '#9E8E7E',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  transition: 'color 180ms',
+                }}>{char.role}</div>
+              </div>
+
+              {/* Selected checkmark */}
+              {isSelected && (
+                <div style={{
+                  width: 20, height: 20,
+                  borderRadius: '50%',
+                  background: char.accentColor || char.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}>✓</div>
+              )}
+
+              {/* Pro lock badge */}
+              {isLocked && (
+                <div style={{
+                  position: 'absolute',
+                  top: 8, right: 8,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'rgba(201,107,46,0.1)',
+                  border: '1px solid rgba(201,107,46,0.2)',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: '#C96B2E',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>Pro</div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Behaviour description — shows below grid when selected */}
+      {(() => {
+        const selected = CHARACTERS.find(c => c.tone === value)
+        if (!selected) return null
+        return (
+          <div style={{
+            gridColumn: '1 / -1',
+            padding: '14px 16px',
+            borderRadius: 12,
+            background: `rgba(${hexToRgb(selected.accentColor || selected.color)}, 0.06)`,
+            border: `1px solid rgba(${hexToRgb(selected.accentColor || selected.color)}, 0.15)`,
+            fontSize: 13,
+            color: '#6B6560',
+            lineHeight: 1.6,
+            fontStyle: 'italic',
+          }}>
+            {selected.behaviour}
+          </div>
         )
-      })}
+      })()}
     </div>
   )
 }
 
-// Helper
 function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3),16)
-  const g = parseInt(hex.slice(3,5),16)
-  const b = parseInt(hex.slice(5,7),16)
+  const r = parseInt(hex.slice(1,3), 16)
+  const g = parseInt(hex.slice(3,5), 16)
+  const b = parseInt(hex.slice(5,7), 16)
   return `${r},${g},${b}`
 }

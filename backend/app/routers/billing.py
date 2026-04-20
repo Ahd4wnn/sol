@@ -70,12 +70,13 @@ async def create_order(payload: dict, user=Depends(get_current_user)):
             "amount": plan["amount"],
             "currency": plan["currency"],
             "notes": {
-                "user_id": user.id,
-                "plan": plan_id,
-                "email": user.email
+                "user_id": str(user.id),
+                "plan": str(plan_id),
+                "email": str(user.email) if user.email else ""
             }
         })
 
+        user_email = getattr(user, "email", None) or ""
         return {
             "order_id": order["id"],
             "amount": plan["amount"],
@@ -83,12 +84,15 @@ async def create_order(payload: dict, user=Depends(get_current_user)):
             "plan": plan_id,
             "description": plan["description"],
             "key_id": settings.razorpay_key_id,
-            "user_email": user.email,
+            "user_email": user_email,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"create_order failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not create order"})
+        logger.error(f"create_order failed: {type(e).__name__}: {e}", exc_info=True)
+        error_msg = str(e)
+        raise HTTPException(status_code=500, detail={"error": True, "message": f"Could not create order: {error_msg}"})
 
 @router.post("/verify-payment")
 async def verify_payment(payload: dict, user=Depends(get_current_user)):

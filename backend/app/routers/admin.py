@@ -220,3 +220,98 @@ async def list_codes(admin=Depends(require_admin)):
     except Exception as e:
         logger.error(f"list_codes failed: {e}")
         raise HTTPException(status_code=500, detail={"error": True, "message": "Could not fetch codes"})
+
+@router.get("/creators")
+async def list_creators(admin=Depends(require_admin)):
+    res = supabase.table("creators")\
+        .select("*, referrals(count)")\
+        .order("created_at", desc=True).execute()
+    return {"creators": res.data or []}
+
+@router.post("/creators")
+async def create_creator(payload: dict, admin=Depends(require_admin)):
+    try:
+        import hashlib
+        password = payload.pop("password", "")
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+        creator_res = supabase.table("creators").insert({
+            "name": payload["name"],
+            "email": payload["email"].lower(),
+            "handle": payload.get("handle", ""),
+            "promo_code": payload["promo_code"].upper(),
+            "ref_slug": payload["ref_slug"].lower(),
+            "commission_rate": payload.get("commission_rate", 30),
+            "user_discount": payload.get("user_discount", 20),
+            "bonus_messages": payload.get("bonus_messages", 10),
+            "payout_info": payload.get("payout_info", ""),
+        }).execute()
+
+        creator_id = creator_res.data[0]["id"]
+
+        supabase.table("creator_accounts").insert({
+            "creator_id": creator_id,
+            "password_hash": password_hash,
+        }).execute()
+
+        return {"success": True, "creator": creator_res.data[0]}
+    except Exception as e:
+        logger.error(f"create_creator failed: {e}")
+        raise HTTPException(status_code=500,
+            detail={"error": True, "message": str(e)})
+
+@router.patch("/creators/{creator_id}")
+async def update_creator(
+    creator_id: str, payload: dict, admin=Depends(require_admin)
+):
+    try:
+        supabase.table("creators")\
+            .update(payload)\
+            .eq("id", creator_id).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500,
+            detail={"error": True, "message": str(e)})
+
+@router.post("/creators/{creator_id}/payout")
+async def mark_payout(
+    creator_id: str, payload: dict, admin=Depends(require_admin)
+):
+    try:
+        amount = payload.get("amount")
+
+        # Get pending referral IDs
+        refs = supabase.table("referrals")\
+            .select("id")\
+            .eq("creator_id", creator_id)\
+            .eq("commission_status", "pending").execute()
+        ref_ids = [r["id"] for r in (refs.data or [])]
+
+        # Mark referrals as paid
+        supabase.table("referrals")\
+            .update({"commission_status": "paid"})\
+            .eq("creator_id", creator_id)\
+            .eq("commission_status", "pending").execute()
+
+        # Update creator total_paid
+        creator = supabase.table("creators")\
+            .select("total_paid").eq("id", creator_id)\
+            .limit(1).execute()
+        current_paid = (creator.data or [{}])[0].get("total_paid") or 0
+
+        supabase.table("creators")\
+            .update({"total_paid": current_paid + amount})\
+            .eq("id", creator_id).execute()
+
+        # Log payout
+        supabase.table("creator_payouts").insert({
+            "creator_id": creator_id,
+            "amount": amount,
+            "referral_ids": ref_ids,
+            "notes": payload.get("notes", ""),
+        }).execute()
+
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500,
+            detail={"error": True, "message": str(e)})
