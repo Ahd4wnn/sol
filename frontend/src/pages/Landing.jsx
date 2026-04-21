@@ -806,67 +806,95 @@ export default function Landing() {
       {/* ── FOOTER ── */}
       <footer style={{
         borderTop: '1px solid rgba(232,227,221,0.6)',
-        padding: '32px 48px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 16,
+        padding: '48px 48px 32px',
         maxWidth: 1100,
         margin: '0 auto',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 24,
-            height: 24,
-            borderRadius: '50%',
-            background: '#C96B2E',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontFamily: 'Fraunces, serif',
-            fontStyle: 'italic',
-            fontSize: 11,
-          }}>S</div>
-          <span style={{
-            fontFamily: 'Fraunces, serif',
-            fontStyle: 'italic',
-            fontSize: 16,
-            color: '#6B6560',
-          }}>Sol</span>
-          <span style={{ color: '#C8C3BD', fontSize: 13, marginLeft: 8 }}>
-            Made with care for students everywhere.
-          </span>
+        {/* Acknowledgment */}
+        <div style={{ marginBottom: 48 }}>
+          <h4 style={{ 
+            fontSize: 12, 
+            fontWeight: 600, 
+            color: '#1A1714', 
+            letterSpacing: '0.08em', 
+            textTransform: 'uppercase',
+            marginBottom: 12,
+            fontFamily: 'DM Sans, sans-serif'
+          }}>Acknowledgment</h4>
+          <p style={{ 
+            fontSize: 14, 
+            color: '#6B6560', 
+            lineHeight: 1.6, 
+            margin: 0,
+            maxWidth: 800
+          }}>
+            Sol is not designed to be used in crisis. If you are in crisis, please seek out professional help, 
+            or a crisis line. You can find resources at <a href="https://findahelpline.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#C96B2E', textDecoration: 'underline' }}>www.findahelpline.com</a>.
+          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          {['Privacy', 'Terms', 'Contact'].map(link => (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          borderTop: '1px solid rgba(232,227,221,0.4)',
+          paddingTop: 32,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: '#C96B2E',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontFamily: 'Fraunces, serif',
+              fontStyle: 'italic',
+              fontSize: 11,
+            }}>S</div>
+            <span style={{
+              fontFamily: 'Fraunces, serif',
+              fontStyle: 'italic',
+              fontSize: 16,
+              color: '#6B6560',
+            }}>Sol</span>
+            <span style={{ color: '#C8C3BD', fontSize: 13, marginLeft: 8 }}>
+              Made with care for students everywhere.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+            {['Privacy', 'Terms', 'Contact'].map(link => (
+              <a
+                key={link}
+                href={
+                  link === 'Privacy' ? '/privacy' :
+                  link === 'Terms' ? '/terms' :
+                  'mailto:hello@talktosol.online'
+                }
+                style={{
+                  fontSize: 13,
+                  color: '#9E8E7E',
+                  textDecoration: 'none',
+                  transition: 'color 150ms',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#C96B2E'}
+                onMouseLeave={e => e.currentTarget.style.color = '#9E8E7E'}
+              >{link}</a>
+            ))}
             <a
-              key={link}
-              href={
-                link === 'Privacy' ? '/privacy' :
-                link === 'Terms' ? '/terms' :
-                'mailto:hello@talktosol.online'
-              }
+              href="mailto:hello@talktosol.online"
               style={{
                 fontSize: 13,
-                color: '#9E8E7E',
+                color: '#C8C3BD',
                 textDecoration: 'none',
-                transition: 'color 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.color = '#C96B2E'}
-              onMouseLeave={e => e.currentTarget.style.color = '#9E8E7E'}
-            >{link}</a>
-          ))}
-          <a
-            href="mailto:hello@talktosol.online"
-            style={{
-              fontSize: 13,
-              color: '#C8C3BD',
-              textDecoration: 'none',
-            }}
-          >hello@talktosol.online</a>
+            >hello@talktosol.online</a>
+          </div>
         </div>
       </footer>
     </div>
