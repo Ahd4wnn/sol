@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /auth
+Disallow: /dashboard
+Disallow: /session
+Disallow: /sessions
+Disallow: /settings
+Disallow: /profile
+Disallow: /memory
+Disallow: /admin
+Disallow: /creator
+Disallow: /upgrade
+Disallow: /onboarding
+Disallow: /api/
+
+Sitemap: https://talktosol.online/sitemap.xml

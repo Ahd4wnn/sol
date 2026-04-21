@@ -326,7 +326,6 @@ export default function Auth() {
               Google
             </button>
 
-            {/* Magic link */}
             <p style={{
               textAlign: 'center',
               marginTop: 18,
@@ -350,6 +349,29 @@ export default function Auth() {
               >
                 send me a sign-in link
               </button>
+            </p>
+
+            <p style={{
+              textAlign: 'center',
+              marginTop: 20,
+              fontSize: 12,
+              color: '#C8C3BD',
+              lineHeight: 1.8,
+            }}>
+              By continuing you agree to our{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#9E8E7E', textDecoration: 'underline' }}
+              >Terms of Service</a>
+              {' '}and{' '}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#9E8E7E', textDecoration: 'underline' }}
+              >Privacy Policy</a>
             </p>
           </>
         )}

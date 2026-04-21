@@ -840,18 +840,33 @@ export default function Landing() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           {['Privacy', 'Terms', 'Contact'].map(link => (
-            <span key={link} style={{
-              fontSize: 13,
-              color: '#9E8E7E',
-              cursor: 'pointer',
-              transition: 'color 150ms',
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = '#C96B2E'}
-            onMouseLeave={e => e.currentTarget.style.color = '#9E8E7E'}
-            >{link}</span>
+            <a
+              key={link}
+              href={
+                link === 'Privacy' ? '/privacy' :
+                link === 'Terms' ? '/terms' :
+                'mailto:hello@talktosol.online'
+              }
+              style={{
+                fontSize: 13,
+                color: '#9E8E7E',
+                textDecoration: 'none',
+                transition: 'color 150ms',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#C96B2E'}
+              onMouseLeave={e => e.currentTarget.style.color = '#9E8E7E'}
+            >{link}</a>
           ))}
+          <a
+            href="mailto:hello@talktosol.online"
+            style={{
+              fontSize: 13,
+              color: '#C8C3BD',
+              textDecoration: 'none',
+            }}
+          >hello@talktosol.online</a>
         </div>
       </footer>
     </div>
