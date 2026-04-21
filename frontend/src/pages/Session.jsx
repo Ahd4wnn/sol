@@ -196,7 +196,7 @@ export default function Session() {
             </div>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            {billingStatus && !billingStatus.is_pro && (
+            {billingStatus && billingStatus.is_pro !== true && (
               <span style={{
                 fontSize: 12,
                 color: billingStatus.messages_remaining <= 5 ? '#C0392B' : '#9E8E7E',

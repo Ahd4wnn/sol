@@ -16,22 +16,22 @@ export function Sidebar() {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   
-  const [isPro, setIsPro] = useState(true) // default true to avoid flash
+  const [isPro, setIsPro] = useState(null) // null = loading
   const cacheRef = useRef({ data: null, timestamp: 0 })
 
   useEffect(() => {
     const fetchBillingStatus = async () => {
       const now = Date.now()
       if (cacheRef.current.data && now - cacheRef.current.timestamp < 60000) {
-        setIsPro(cacheRef.current.data.is_pro)
+        setIsPro(cacheRef.current.data.is_pro === true)
         return
       }
       try {
         const res = await api.get('/api/billing/status')
         cacheRef.current = { data: res.data, timestamp: now }
-        setIsPro(res.data.is_pro)
+        setIsPro(res.data.is_pro === true)
       } catch (e) {
-        setIsPro(true)
+        setIsPro(false)
       }
     }
     fetchBillingStatus()
@@ -133,7 +133,7 @@ export function Sidebar() {
       </nav>
 
       {/* Upgrade or Pro badge */}
-      {!isPro && (
+      {isPro === false && (
         <div style={{
           margin: '8px 12px 16px',
           padding: '16px',
@@ -180,7 +180,7 @@ export function Sidebar() {
         </div>
       )}
 
-      {isPro && (
+      {isPro === true && (
         <div style={{
           margin: '8px 12px 16px',
           padding: '10px 14px',

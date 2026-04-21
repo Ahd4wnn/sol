@@ -1,49 +1,80 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from app.services.supabase_client import supabase
 from app.config import settings
-from app.routers.push import send_push_to_user
 import logging
+from datetime import datetime, timedelta
+import random
 
 logger = logging.getLogger("sol")
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
-@router.post("/send-daily-nudges")
-async def send_daily_nudges(request: Request):
-    # Verify it's called from admin or cron secret
-    secret = request.headers.get("x-cron-secret")
+MORNING_MESSAGES = [
+  ("Good morning ☀️", "How are you actually starting today? Sol is here."),
+  ("New day, real talk", "What's on your mind before the day takes over?"),
+  ("Morning check-in", "5 minutes with Sol before the chaos starts."),
+  ("Hey.", "How did you sleep? Sol wants to know."),
+  ("Before you spiral today —", "Come say hi to Sol first."),
+]
+
+AFTERNOON_MESSAGES = [
+  ("Midday check ☀️", "How's the energy? Still running or running on fumes?"),
+  ("Quick check-in", "You've been going all day. How are you actually doing?"),
+  ("Afternoon, real one.", "Got 5 minutes? Sol's been thinking about you."),
+  ("How's the day treating you?", "Sol is here if you need to vent."),
+  ("Checking in", "What's the vibe right now? No filter needed."),
+]
+
+EVENING_MESSAGES = [
+  ("End of day 🌙", "How are you really feeling right now?"),
+  ("Before you sleep —", "What's one thing that's been sitting with you today?"),
+  ("Evening check-in", "Sol is here. The day is almost done. How was it?"),
+  ("Hey, it's late.", "Still carrying something? Sol's listening."),
+  ("Night check ☀️", "How did today go? The real version."),
+]
+
+def verify_cron(request: Request):
+    secret = request.headers.get("x-cron-secret", "")
     if secret != settings.cron_secret:
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403,
+            detail={"error": True, "message": "Forbidden"})
 
-    from datetime import datetime, timedelta
+@router.post("/send-morning")
+async def send_morning(request: Request):
+    verify_cron(request)
+    return await _send_batch(MORNING_MESSAGES, "sol-morning")
 
-    # Find users who haven't had a session in 3+ days
-    three_days_ago = (datetime.utcnow() - timedelta(days=3)).isoformat()
+@router.post("/send-afternoon")
+async def send_afternoon(request: Request):
+    verify_cron(request)
+    return await _send_batch(AFTERNOON_MESSAGES, "sol-afternoon")
 
-    sessions_res = supabase.table("therapy_sessions")\
-        .select("user_id, created_at")\
-        .lt("created_at", three_days_ago)\
-        .order("created_at", desc=True).execute()
+@router.post("/send-evening")
+async def send_evening(request: Request):
+    verify_cron(request)
+    return await _send_batch(EVENING_MESSAGES, "sol-evening")
 
-    # Get unique user IDs who haven't sessioned recently
-    seen = set()
-    stale_users = []
-    for s in (sessions_res.data or []):
-        uid = s["user_id"]
-        if uid not in seen:
-            seen.add(uid)
-            stale_users.append(uid)
+async def _send_batch(messages: list, tag: str) -> dict:
+    from app.routers.push import send_push_to_user
 
-    NUDGE_MESSAGES = [
-        ("Sol misses you.", "You don't have to have it figured out. Just say hi."),
-        ("Hey. How are you actually doing?", "Sol's here whenever you're ready."),
-        ("It's been a few days.", "Even a 5-minute check-in can shift things."),
-        ("No pressure.", "But Sol's been thinking about you."),
-    ]
+    # Get all users with push subscriptions
+    subs = supabase.table("push_subscriptions")\
+        .select("user_id")\
+        .execute()
 
-    import random
-    for user_id in stale_users[:50]:  # cap at 50 per run
-        title, body = random.choice(NUDGE_MESSAGES)
-        await send_push_to_user(user_id, title, body,
-                                url="/session/new", tag="sol-nudge")
+    user_ids = list({s["user_id"] for s in (subs.data or [])})
 
-    return {"sent": len(stale_users[:50])}
+    sent = 0
+    for user_id in user_ids:
+        try:
+            title, body = random.choice(messages)
+            await send_push_to_user(
+                user_id, title, body,
+                url="/dashboard",
+                tag=tag
+            )
+            sent += 1
+        except Exception as e:
+            logger.warning(f"Push failed for {user_id}: {e}")
+
+    logger.info(f"Sent {sent} {tag} notifications")
+    return {"sent": sent, "tag": tag}

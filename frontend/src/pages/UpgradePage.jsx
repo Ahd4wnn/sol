@@ -52,7 +52,7 @@ export default function UpgradePage() {
     }
   }
 
-  const isPro = billingStatus?.is_pro
+  const isPro = billingStatus?.is_pro === true
 
   return (
     <AppShell>
@@ -65,7 +65,7 @@ export default function UpgradePage() {
 
         {/* Header */}
         <div style={{ marginBottom: 48, textAlign: 'center' }}>
-          <h1 style={{
+          <h1 className="page-title" style={{
             fontFamily: 'Fraunces, serif',
             fontSize: 40,
             fontWeight: 300,
@@ -124,7 +124,7 @@ export default function UpgradePage() {
         {/* Plan cards (free users only) */}
         {!isPro && (
           <>
-            <div style={{
+            <div className="upgrade-plans-grid" style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
               gap: 16,

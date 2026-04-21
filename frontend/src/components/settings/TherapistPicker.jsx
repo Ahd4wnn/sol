@@ -156,7 +156,7 @@ export function TherapistPicker({ value, onChange, isPro }) {
           100% { background-position: -200% 0; }
         }
       `}</style>
-      <div className="tpicker-grid" style={{
+      <div className="tpicker-grid persona-grid" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
         gap: 10,
@@ -169,6 +169,7 @@ export function TherapistPicker({ value, onChange, isPro }) {
           return (
             <button
               key={char.id}
+              className="persona-card"
               onClick={() => !isLocked && onChange(char.tone)}
               style={{
                 padding: '16px 18px',
@@ -219,7 +220,7 @@ export function TherapistPicker({ value, onChange, isPro }) {
 
               {/* Text */}
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
+                <div className="persona-name" style={{
                   fontFamily: 'Fraunces, serif',
                   fontStyle: 'italic',
                   fontSize: 16,
@@ -238,8 +239,12 @@ export function TherapistPicker({ value, onChange, isPro }) {
                     ? (char.accentColor || char.color)
                     : '#9E8E7E',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.04em',
                   transition: 'color 180ms',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '100%',
                 }}>{char.role}</div>
               </div>
 
@@ -285,7 +290,7 @@ export function TherapistPicker({ value, onChange, isPro }) {
         const selected = CHARACTERS.find(c => c.tone === value)
         if (!selected) return null
         return (
-          <div style={{
+          <div className="persona-behaviour-panel" style={{
             gridColumn: '1 / -1',
             padding: '14px 16px',
             borderRadius: 12,

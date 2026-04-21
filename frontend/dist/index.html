@@ -2,16 +2,94 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sol - Your mind deserves a friend</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Primary Meta -->
+    <title>Sol — AI Therapy for College Students</title>
+    <meta name="description"
+      content="Sol is an AI therapist that actually gets you. Free to start. Available 24/7. Built for college students who need someone to talk to." />
+    <meta name="keywords"
+      content="AI therapy, mental health app, college students, anxiety help, therapy app, emotional support, Sol app" />
+    <meta name="author" content="Sol" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://talktosol.online/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://talktosol.online/" />
+    <meta property="og:title" content="Sol — AI Therapy for College Students" />
+    <meta property="og:description"
+      content="An AI therapist that remembers everything, adapts to you completely, and shows up at 3am. Free to start." />
+    <meta property="og:image" content="https://talktosol.online/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Sol" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://talktosol.online/" />
+    <meta name="twitter:title" content="Sol — AI Therapy for College Students" />
+    <meta name="twitter:description"
+      content="An AI therapist that actually gets you. Free to start." />
+    <meta name="twitter:image" content="https://talktosol.online/og-image.png" />
+
+    <!-- PWA / Mobile -->
+    <meta name="theme-color" content="#C96B2E" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Sol" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-0lcvGRXi.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CN5RVHcJ.css">
+
+    <!-- Razorpay (existing in body, moving to head per user request or keep in body) -->
+    <!-- The user request has Razorpay tag in head, so we add it here -->
+    <!-- Actually user had it in body, user prompt has it in head -->
+
+    <!-- Structured Data — Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Sol",
+      "url": "https://talktosol.online",
+      "logo": "https://talktosol.online/icons/icon-512.png",
+      "description": "AI therapy app for college students",
+      "email": "hello@talktosol.online",
+      "sameAs": []
+    }
+    </script>
+
+    <!-- Structured Data — WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Sol",
+      "url": "https://talktosol.online",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": "Free tier available"
+      },
+      "description": "An AI therapist that remembers everything and adapts to you completely. Built for college students."
+    }
+    </script>
+    <script type="module" crossorigin src="/assets/index-Dm9fjIVI.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C9gyRTch.css">
   </head>
   <body>
     <div id="root"></div>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </body>
 </html>

@@ -66,3 +66,19 @@ async def send_push_to_user(user_id: str, title: str, body: str,
                         .eq("endpoint", sub["endpoint"]).execute()
     except Exception as e:
         logger.error(f"send_push_to_user failed for {user_id}: {e}")
+
+@router.post("/test")
+async def send_test_notification(user=Depends(get_current_user)):
+    """Sends a test push immediately after subscribing."""
+    try:
+        await send_push_to_user(
+            user.id,
+            "Sol is ready ☀️",
+            "Notifications are on. Sol will check in with you daily.",
+            url="/dashboard",
+            tag="sol-test"
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"test notification failed: {e}")
+        return {"success": False, "error": str(e)}

@@ -96,26 +96,26 @@ export default function Settings() {
     <AppShell>
       <div className="flex-1 bg-sol-bg w-full overflow-y-auto">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-sol-border px-8 flex items-center sticky top-0 z-10">
-           <h1 className="text-2xl font-display text-sol-text-primary">Settings</h1>
+           <h1 className="page-title text-2xl font-display text-sol-text-primary">Settings</h1>
         </header>
 
         <main className="max-w-3xl mx-auto px-6 py-12">
-           <div className="flex space-x-6 border-b border-gray-200 mb-10">
+           <div className="settings-tabs flex space-x-6 border-b border-gray-200 mb-10">
              <button 
                onClick={() => setActiveTab('therapist')}
-               className={`pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'therapist' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
+               className={`settings-tab-btn pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'therapist' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
              >
                Sol Persona
              </button>
              <button 
                onClick={() => setActiveTab('intake')}
-               className={`pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'intake' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
+               className={`settings-tab-btn pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'intake' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
              >
                Initial Intake Answers
              </button>
              <button 
                onClick={() => setActiveTab('redeem')}
-               className={`pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'redeem' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
+               className={`settings-tab-btn pb-4 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'redeem' ? 'border-sol-primary text-sol-primary' : 'border-transparent text-sol-text-secondary hover:text-sol-text-primary'}`}
              >
                ✦ Redeem Code
              </button>
@@ -123,10 +123,10 @@ export default function Settings() {
 
            {activeTab === 'therapist' && (
              <section className="space-y-8 animate-fade-in">
-                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-6">
+                <div className="settings-section bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-6">
                    <div>
                      <div style={{ marginBottom: 10 }}>
-                        <label className="block font-semibold text-sol-text-primary" style={{ fontSize: 15 }}>Choose your Sol.</label>
+                        <label className="settings-section-title block font-semibold text-sol-text-primary" style={{ fontSize: 15 }}>Choose your Sol.</label>
                         <p className="text-sol-text-secondary" style={{ fontSize: 13, marginTop: 4, lineHeight: 1.5, opacity: 0.8 }}>Each one is a different way of thinking.<br/>Not a different person — a different lens.</p>
                       </div>
                      <TherapistPicker
@@ -167,7 +167,7 @@ export default function Settings() {
                    </div>
                    
                    <div>
-                     <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Response Length</label>
+                     <label className="settings-section-title block text-sm font-semibold text-sol-text-secondary mb-3">Response Length</label>
                      <CustomDropdown
                        value={tSettings.response_length}
                        onChange={(val) => setTSettings({...tSettings, response_length: val})}
@@ -182,8 +182,8 @@ export default function Settings() {
 
 
                    <div>
-                     <label className="block text-sm font-semibold text-sol-text-secondary mb-3">Therapeutic Focus Areas (Max 3)</label>
-                     <div className="flex flex-wrap gap-3">
+                     <label className="settings-section-title block text-sm font-semibold text-sol-text-secondary mb-3">Therapeutic Focus Areas (Max 3)</label>
+                     <div className="focus-areas-grid flex flex-wrap gap-3">
                        {FOCUS_AREAS.map(area => (
                          <button
                            key={area}
@@ -276,7 +276,7 @@ export default function Settings() {
                  ) : (
                    <div className="space-y-6">
                      {Object.entries(intakeData).map(([key, value]) => (
-                       <div key={key} className="border-b border-gray-50 pb-4 last:border-0 last:pb-0">
+                       <div key={key} className="intake-answer-row flex border-b border-gray-50 pb-4 last:border-0 last:pb-0">
                          <p className="text-xs text-sol-text-secondary font-mono mb-1 uppercase tracking-wider">{key}</p>
                          <p className="text-sol-text-primary font-medium">{String(value)}</p>
                        </div>

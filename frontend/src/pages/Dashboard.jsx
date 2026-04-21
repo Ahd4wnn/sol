@@ -31,7 +31,7 @@ export default function Dashboard() {
       .catch(() => {})  // non-fatal
   }, []);
 
-  const isPro = billingStatus?.is_pro || false;
+  const isPro = billingStatus?.is_pro === true;
   const messagesUsed = billingStatus?.messages_used || 0;
   const messagesLimit = billingStatus?.messages_limit || 20;
   const messagesRemaining = messagesLimit - messagesUsed;
@@ -89,7 +89,7 @@ export default function Dashboard() {
   return (
     <AppShell>
       <div className="flex-1 overflow-y-auto w-full" style={{ background: 'transparent' }}>
-        <div className="max-w-6xl mx-auto px-6 md:px-12 pt-16 md:pt-24 pb-32">
+        <div className="app-page-content max-w-6xl mx-auto px-6 md:px-12 pt-16 md:pt-24 pb-32">
           {/* Ambient Greeting Block */}
           <div style={{
             position: 'relative',
@@ -249,7 +249,7 @@ export default function Dashboard() {
           {/* Stats Row */}
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-16"
+            className="stats-row grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-16"
           >
             <div className="glass-card p-6 flex flex-col transition-colors" style={{ borderLeft: '3px solid rgba(201,107,46,0.4)' }}>
               <div className="text-sol-primary mb-3"><TrendingUp size={24} /></div>
@@ -296,7 +296,7 @@ export default function Dashboard() {
                   <div
                     key={session.id}
                     onClick={() => navigate(`/session/${session.id}`)}
-                    className="snap-start flex-none w-[280px] md:w-[320px] glass-card p-6 cursor-pointer group hover:border-sol-primary/20"
+                    className="session-card snap-start flex-none w-[280px] md:w-[320px] glass-card p-6 cursor-pointer group hover:border-sol-primary/20"
                   >
                     <p className="text-xs font-semibold uppercase tracking-wider text-sol-text-secondary mb-3">
                       {new Date(session.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

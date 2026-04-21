@@ -30,7 +30,7 @@ export default function Sessions() {
       <div className="flex-1 bg-sol-bg w-full">
         {/* Header */}
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-sol-border px-8 flex items-center sticky top-0 z-10">
-           <h1 className="text-2xl font-display text-sol-text-primary">All Sessions</h1>
+           <h1 className="page-title text-2xl font-display text-sol-text-primary">All Sessions</h1>
         </header>
 
         <main className="max-w-4xl mx-auto px-6 py-12">

@@ -52,7 +52,7 @@ export default function Memory() {
     <AppShell>
       <div className="flex-1 bg-sol-bg w-full overflow-y-auto">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-sol-border px-6 md:px-8 flex items-center justify-between sticky top-0 z-10">
-           <h1 className="text-2xl font-display text-sol-text-primary">Memory</h1>
+           <h1 className="page-title text-2xl font-display text-sol-text-primary">Memory</h1>
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-8 md:py-12">
@@ -76,7 +76,7 @@ export default function Memory() {
                 />
               </div>
               
-              <div className="flex overflow-x-auto w-full md:w-auto hide-scrollbar -mx-6 px-6 md:mx-0 md:px-0 gap-2">
+              <div className="memory-tabs flex overflow-x-auto w-full md:w-auto hide-scrollbar -mx-6 px-6 md:mx-0 md:px-0 gap-2">
                  {TABS.map(tab => {
                    const Icon = tab.icon;
                    const isActive = activeTab === tab.id;

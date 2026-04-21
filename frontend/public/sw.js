@@ -43,30 +43,64 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() || {}
-  const title = data.title || 'Sol'
+  let data = {}
+  try {
+    data = event.data?.json() || {}
+  } catch (e) {
+    data = {
+      title: 'Sol ☀️',
+      body: event.data?.text() || 'Sol is here whenever you need it.'
+    }
+  }
+
+  const title = data.title || 'Sol ☀️'
   const options = {
-    body: data.body || 'Sol is here whenever you need it.',
+    body: data.body || "Sol is here whenever you need it.",
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',
     data: { url: data.url || '/dashboard' },
-    vibrate: [100, 50, 100],
+    vibrate: [200, 100, 200],
     tag: data.tag || 'sol-notification',
     renotify: true,
-    actions: data.actions || [],
+    requireInteraction: false,
+    silent: false,
+    actions: [
+      { action: 'open', title: 'Open Sol' },
+      { action: 'dismiss', title: 'Later' }
+    ]
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  )
 })
 
 // Notification click — open the app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+
+  if (event.action === 'dismiss') return
+
   const url = event.notification.data?.url || '/dashboard'
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(windowClients => {
-      const existing = windowClients.find(c => c.url.includes(url))
-      if (existing) return existing.focus()
-      return clients.openWindow(url)
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(windowClients => {
+      // Focus existing tab if open
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) &&
+            'focus' in client) {
+          client.focus()
+          client.navigate(url)
+          return
+        }
+      }
+      // Open new tab
+      if (clients.openWindow) {
+        return clients.openWindow(url)
+      }
     })
   )
 })
