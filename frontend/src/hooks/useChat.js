@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 
 export function useChat(sessionId, setMessages) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
+  const sendingRef = useRef(false);
 
   const sendMessage = async (content) => {
     if (!content.trim() || isStreaming) return;
+    if (sendingRef.current) return;  // LOCK: prevent double send
+    sendingRef.current = true;
 
     setError(null);
 
@@ -160,6 +163,7 @@ export function useChat(sessionId, setMessages) {
       setMessages(prev => prev.filter(m => m.id !== astMsg.id));
     } finally {
       setIsStreaming(false);
+      sendingRef.current = false;  // UNLOCK
     }
   };
 

@@ -84,18 +84,26 @@ export default function Session() {
   }, [isStreaming]);
 
   useEffect(() => {
+    // Guard: only run once, only when session is fully loaded,
+    // only when there are zero messages, only when opening_context exists
     if (
-      !loading &&
-      session &&
-      !error &&
-      dbMessages.length === 0 &&
-      session.opening_context &&
-      !hasAutoStarted.current
-    ) {
-      hasAutoStarted.current = true;
+      hasAutoStarted.current ||
+      loading ||
+      !session ||
+      error ||
+      dbMessages.length > 0 ||  // if messages exist, don't auto-send
+      !session.opening_context
+    ) return;
+
+    hasAutoStarted.current = true;
+
+    // Small delay to ensure component is fully mounted
+    const timer = setTimeout(() => {
       sendMessage(session.opening_context);
-    }
-  }, [loading, session, error, dbMessages.length]);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [loading, session?.id]);
 
   const handleInput = (e) => {
     setInput(e.target.value);

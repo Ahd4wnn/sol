@@ -17,21 +17,73 @@ from app.services.subscription_service import check_can_send_message, increment_
 
 logger = logging.getLogger("sol")
 
-CRISIS_KEYWORDS = [
-    "want to die", "kill myself", "end my life",
-    "suicide", "suicidal", "no reason to live",
-    "better off dead", "better off without me",
-    "don't want to be here", "can't do this anymore",
-    "want to disappear forever", "ending it",
-    "hurt myself", "cutting myself", "self harm",
-    "self-harm", "overdose", "won't be here",
-    "last message", "goodbye forever",
+SEVERE_CRISIS_KEYWORDS = [
+    "going to commit suicide",
+    "going to kill myself",
+    "going to end my life",
+    "about to kill myself",
+    "about to commit suicide",
+    "want to commit suicide",
+    "planning to kill myself",
+    "decided to kill myself",
+    "will kill myself",
+    "i will die tonight",
+    "ending my life tonight",
+    "ending it tonight",
+    "this is my last",
+    "goodbye forever",
+    "won't be alive",
+    "i am going to commit suicide",
 ]
 
-def detect_crisis(text: str) -> bool:
-    text_lower = text.lower()
-    return any(keyword in text_lower for keyword in CRISIS_KEYWORDS)
+MODERATE_CRISIS_KEYWORDS = [
+    "want to die", "i want to die",
+    "don't want to live", "no reason to live",
+    "better off dead", "better off without me",
+    "everyone would be better without me",
+    "i am done with my life",
+    "done with life", "done with everything",
+    "can't go on", "can't do this anymore",
+    "hurt myself", "cutting myself",
+    "self harm", "self-harm",
+    "suicide", "suicidal",
+    "don't want to be here",
+    "want to disappear forever", "ending it",
+    "overdose", "won't be here",
+    "last message",
+]
 
+def detect_crisis_level(text: str) -> str:
+    """Returns 'severe', 'moderate', or 'none'"""
+    text_lower = text.lower()
+    if any(kw in text_lower for kw in SEVERE_CRISIS_KEYWORDS):
+        return "severe"
+    if any(kw in text_lower for kw in MODERATE_CRISIS_KEYWORDS):
+        return "moderate"
+    return "none"
+
+SEVERE_CRISIS_RESPONSE = """I hear you. And I'm so glad you're still here, talking to me right now.
+
+What you just said is the most important thing you could have told me. Please don't go anywhere.
+
+**Right now, please reach out to someone who can be with you:**
+
+🇮🇳 **iCall** — Free, confidential, real humans
+📞 **9152987821**
+Mon–Sat, 8am–10pm IST
+🌐 icallhelpline.org
+
+🇮🇳 **Vandrevala Foundation** — Available right now, 24/7
+📞 **1860-2662-345**
+🌐 vandrevalafoundation.com
+
+🇮🇳 **NIMHANS Helpline** — Government mental health support
+📞 **080-46110007**
+🌐 nimhans.ac.in
+
+If you are in immediate danger, please go to your nearest hospital emergency room or call someone you trust to be with you right now.
+
+I'm still here with you. Can you tell me — are you safe right now?"""
 
 
 def extract_and_strip_feedback(content: str) -> tuple[str, dict | None]:
@@ -78,18 +130,36 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
             "session_id": payload.session_id, "role": "user", "content": payload.content
         }).execute()
 
-        is_crisis = detect_crisis(payload.content)
-        if is_crisis:
-            logger.warning(
-                f"CRISIS DETECTED for user {user.id}: "
-                f"{payload.content[:50]}..."
-            )
+        crisis_level = detect_crisis_level(payload.content)
+
+        if crisis_level == "severe":
+            logger.warning(f"SEVERE CRISIS: user={user.id} message={payload.content[:80]}")
             try:
                 supabase.table("memory_notes").insert({
                     "user_id": user.id,
-                    "note": f"[CRISIS FLAG] Detected in message: "
-                            f"{payload.content[:200]}",
-                    "tags": ["crisis_flag"],
+                    "note": f"[SEVERE CRISIS FLAG] {payload.content[:300]}",
+                    "tags": ["crisis_flag", "severe"],
+                    "source_session_id": payload.session_id,
+                }).execute()
+            except Exception as ce:
+                logger.error(f"Crisis logging failed: {ce}")
+
+            res = supabase.table("messages").insert({
+                "session_id": payload.session_id,
+                "role": "assistant",
+                "content": SEVERE_CRISIS_RESPONSE,
+            }).execute()
+            final_msg = res.data[0] if (hasattr(res, 'data') and res.data) else {"content": SEVERE_CRISIS_RESPONSE}
+            await increment_message_count(user.id)
+            return final_msg
+
+        if crisis_level == "moderate":
+            logger.warning(f"MODERATE CRISIS: user={user.id} message={payload.content[:80]}")
+            try:
+                supabase.table("memory_notes").insert({
+                    "user_id": user.id,
+                    "note": f"[MODERATE CRISIS FLAG] {payload.content[:300]}",
+                    "tags": ["crisis_flag", "moderate"],
                     "source_session_id": payload.session_id,
                 }).execute()
             except Exception as ce:
@@ -98,16 +168,15 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
         context = await build_context(user.id, payload.session_id)
         system_prompt = build_system_prompt(context)
 
-        if is_crisis:
+        if crisis_level == "moderate":
             crisis_injection = """
 
 ⚠️ URGENT — CRISIS DETECTED ⚠️
 The user's last message contains crisis indicators.
-Follow the CRISIS PROTOCOL exactly as specified above.
-Step 1 first: acknowledge with warmth before anything else.
-Do NOT skip to resources immediately.
-Do NOT show alarm or panic in your response.
-Stay calm, warm, and present.
+Acknowledge with full warmth and zero judgment first.
+Then gently provide these resources:
+iCall: 9152987821 | Vandrevala: 1860-2662-345 (24/7) | NIMHANS: 080-46110007
+Stay in the conversation — do NOT abandon them after giving resources.
 """
             system_prompt = system_prompt + crisis_injection
 
@@ -192,36 +261,81 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
             "session_id": payload.session_id, "role": "user", "content": payload.content
         }).execute()
 
-        is_crisis = detect_crisis(payload.content)
-        if is_crisis:
+        crisis_level = detect_crisis_level(payload.content)
+
+        if crisis_level == "severe":
             logger.warning(
-                f"CRISIS DETECTED for user {user.id}: "
-                f"{payload.content[:50]}..."
+                f"SEVERE CRISIS: user={user.id} "
+                f"message={payload.content[:80]}"
             )
             try:
                 supabase.table("memory_notes").insert({
                     "user_id": user.id,
-                    "note": f"[CRISIS FLAG] Detected in message: "
-                            f"{payload.content[:200]}",
-                    "tags": ["crisis_flag"],
+                    "note": f"[SEVERE CRISIS FLAG] {payload.content[:300]}",
+                    "tags": ["crisis_flag", "severe"],
                     "source_session_id": payload.session_id,
                 }).execute()
-            except Exception as ce:
-                logger.error(f"Crisis logging failed: {ce}")
+            except Exception as e:
+                logger.error(f"Crisis logging failed: {e}")
 
+            # Save the hardcoded crisis response to DB immediately
+            supabase.table("messages").insert({
+                "session_id": payload.session_id,
+                "role": "assistant",
+                "content": SEVERE_CRISIS_RESPONSE,
+            }).execute()
+
+            await increment_message_count(user.id)
+
+            # Stream it to frontend immediately — no AI call needed
+            async def crisis_stream():
+                words = SEVERE_CRISIS_RESPONSE.split(' ')
+                full = ""
+                for i, word in enumerate(words):
+                    chunk = word + (' ' if i < len(words)-1 else '')
+                    full += chunk
+                    safe = (chunk
+                        .replace('\\', '\\\\')
+                        .replace('"', '\\"')
+                        .replace('\n', '\\n'))
+                    yield f'data: {{"delta": "{safe}", "done": false}}\n\n'
+                    await asyncio.sleep(0.02)
+                yield f'data: {{"delta": "", "done": true, "full_content": {json.dumps(full)}}}\n\n'
+
+            return StreamingResponse(
+                crisis_stream(),
+                media_type="text/event-stream"
+            )
+
+        # For moderate crisis — log and inject instructions into prompt
+        if crisis_level == "moderate":
+            logger.warning(
+                f"MODERATE CRISIS: user={user.id} "
+                f"message={payload.content[:80]}"
+            )
+            try:
+                supabase.table("memory_notes").insert({
+                    "user_id": user.id,
+                    "note": f"[MODERATE CRISIS FLAG] {payload.content[:300]}",
+                    "tags": ["crisis_flag", "moderate"],
+                    "source_session_id": payload.session_id,
+                }).execute()
+            except Exception as e:
+                logger.error(f"Crisis logging failed: {e}")
+
+        # Continue with normal AI flow
         context = await build_context(user.id, payload.session_id)
         system_prompt = build_system_prompt(context)
 
-        if is_crisis:
+        if crisis_level == "moderate":
             crisis_injection = """
 
 ⚠️ URGENT — CRISIS DETECTED ⚠️
 The user's last message contains crisis indicators.
-Follow the CRISIS PROTOCOL exactly as specified above.
-Step 1 first: acknowledge with warmth before anything else.
-Do NOT skip to resources immediately.
-Do NOT show alarm or panic in your response.
-Stay calm, warm, and present.
+Acknowledge with full warmth and zero judgment first.
+Then gently provide these resources:
+iCall: 9152987821 | Vandrevala: 1860-2662-345 (24/7) | NIMHANS: 080-46110007
+Stay in the conversation — do NOT abandon them after giving resources.
 """
             system_prompt = system_prompt + crisis_injection
 

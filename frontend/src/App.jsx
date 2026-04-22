@@ -17,6 +17,8 @@ import Memory from './pages/Memory';
 import Profile from './pages/Profile';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import BlogList from './blog/BlogList';
+import BlogPost from './blog/BlogPost';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { OnboardingGuard } from './components/auth/OnboardingGuard';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
@@ -39,6 +41,8 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/blog" element={<BlogList />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/auth" element={
               <AuthRoute>
                 <Auth />
