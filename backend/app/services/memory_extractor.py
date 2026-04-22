@@ -3,7 +3,35 @@ from app.services.openai_client import client
 from app.services.supabase_client import supabase
 
 async def extract_memory(user_id: str, session_id: str, user_message: str, assistant_reply: str):
-    system_prompt = """You are a memory extractor for a therapy AI. Given a therapy exchange, extract 0–2 important facts about the user worth remembering long-term. These could be: names of important people in their life, key relationships, recurring struggles, important life events, stated fears, goals, or beliefs. Return ONLY a JSON array of strings. If nothing important, return []. Example: ["User's mother is named Priya and their relationship is complicated", "User failed an exam last semester and still feels shame about it"]"""
+    EXTRACTION_SYSTEM_PROMPT = """
+You are a memory extractor for a therapy AI.
+Given a therapy exchange, extract 0-2 important FACTS
+about the user worth remembering across ALL sessions.
+
+ONLY extract:
+- Names of important people (family, friends, partners)
+- Key relationships and their dynamics
+- Major life events or situations (job loss, breakup, illness)
+- Stated phobias or triggers
+- Explicitly stated diagnoses or conditions
+
+Do NOT extract:
+- How they felt in this session (that's session-specific)
+- What they talked about this session
+- Their current mood
+- Anything that might change week to week
+
+Return ONLY a JSON array of strings.
+If nothing qualifies, return [].
+
+Example good extractions:
+["User's mother is named Priya, relationship is complicated",
+ "User has been diagnosed with anxiety"]
+
+Example bad extractions (do NOT do these):
+["User felt sad today",
+ "User is stressed about exams this week"]
+"""
     
     user_prompt = f"User said: {user_message}\nSol replied: {assistant_reply}"
 
@@ -11,7 +39,7 @@ async def extract_memory(user_id: str, session_id: str, user_message: str, assis
         completion = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.0

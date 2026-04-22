@@ -37,6 +37,119 @@ export default function MessageBubble({ role, content, isStreaming, timestamp })
     );
   }
 
+  const isCrisisMessage = role === 'assistant' &&
+    content?.includes('iCall') &&
+    content?.includes('9152987821');
+
+  if (isCrisisMessage) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-start',
+        marginBottom: 12,
+      }}>
+        <div style={{
+          maxWidth: '85%',
+          padding: '16px 18px',
+          borderRadius: '18px 18px 18px 4px',
+          background: 'rgba(255,248,244,0.95)',
+          border: '2px solid rgba(201,107,46,0.3)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 2px 16px rgba(201,107,46,0.1)',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 12,
+            paddingBottom: 10,
+            borderBottom: '1px solid rgba(201,107,46,0.15)',
+          }}>
+            <span style={{ fontSize: 18 }}>☀️</span>
+            <span style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#C96B2E',
+            }}>
+              Real support is available
+            </span>
+          </div>
+
+          {/* Render content with phone numbers as tappable links */}
+          <div style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: 14,
+            color: '#1A1714',
+            lineHeight: 1.7,
+            whiteSpace: 'pre-wrap',
+          }}>
+            {content
+              .replace(/\*\*/g, '')  // strip markdown bold
+              .split('\n')
+              .map((line, i) => {
+                // Make phone numbers tappable
+                const phoneRegex = /(\d{3,5}-\d{3,5}-\d{3,5}|\d{10,})/g
+                if (phoneRegex.test(line)) {
+                  const parts = line.split(phoneRegex)
+                  return (
+                    <div key={i} style={{ marginBottom: 4 }}>
+                      {parts.map((part, j) =>
+                        /^\d[\d-]+\d$/.test(part) ? (
+                          <a
+                            key={j}
+                            href={`tel:${part.replace(/-/g, '')}`}
+                            style={{
+                              color: '#C96B2E',
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                              fontSize: 15,
+                            }}
+                          >{part}</a>
+                        ) : (
+                          <span key={j}>{part}</span>
+                        )
+                      )}
+                    </div>
+                  )
+                }
+                // Make URLs tappable
+                if (line.includes('.org') || line.includes('.com')
+                    || line.includes('.in')) {
+                  const urlMatch = line.match(
+                    /[a-zA-Z0-9-]+\.(org|com|in|net)/
+                  )
+                  if (urlMatch) {
+                    return (
+                      <div key={i} style={{ marginBottom: 2 }}>
+                        <a
+                          href={`https://${urlMatch[0]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: '#3D7A5F',
+                            textDecoration: 'underline',
+                            fontSize: 13,
+                          }}
+                        >🌐 {urlMatch[0]}</a>
+                      </div>
+                    )
+                  }
+                }
+                return line ? (
+                  <div key={i} style={{ marginBottom: 2 }}>{line}</div>
+                ) : (
+                  <div key={i} style={{ height: 6 }} />
+                )
+              })
+            }
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const timeString = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
   const isCrisisSupport = !isUser && content?.includes('Sol wants you to know:');
 

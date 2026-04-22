@@ -12,7 +12,25 @@ from app.services.openai_client import client
 from app.services.sol_agent import stream_sol_response
 import logging
 import re
+from datetime import datetime
 from app.services.subscription_service import check_can_send_message, increment_message_count
+
+logger = logging.getLogger("sol")
+
+CRISIS_KEYWORDS = [
+    "want to die", "kill myself", "end my life",
+    "suicide", "suicidal", "no reason to live",
+    "better off dead", "better off without me",
+    "don't want to be here", "can't do this anymore",
+    "want to disappear forever", "ending it",
+    "hurt myself", "cutting myself", "self harm",
+    "self-harm", "overdose", "won't be here",
+    "last message", "goodbye forever",
+]
+
+def detect_crisis(text: str) -> bool:
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in CRISIS_KEYWORDS)
 
 logger = logging.getLogger("sol")
 
@@ -60,9 +78,60 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
             "session_id": payload.session_id, "role": "user", "content": payload.content
         }).execute()
 
+        is_crisis = detect_crisis(payload.content)
+        if is_crisis:
+            logger.warning(
+                f"CRISIS DETECTED for user {user.id}: "
+                f"{payload.content[:50]}..."
+            )
+            try:
+                supabase.table("memory_notes").insert({
+                    "user_id": user.id,
+                    "note": f"[CRISIS FLAG] Detected in message: "
+                            f"{payload.content[:200]}",
+                    "tags": ["crisis_flag"],
+                    "source_session_id": payload.session_id,
+                }).execute()
+            except Exception as ce:
+                logger.error(f"Crisis logging failed: {ce}")
+
         context = await build_context(user.id, payload.session_id)
         system_prompt = build_system_prompt(context)
-        ai_messages = [{"role": "system", "content": system_prompt}] + (context.get("current_messages") or [])
+
+        if is_crisis:
+            crisis_injection = """
+
+⚠️ URGENT — CRISIS DETECTED ⚠️
+The user's last message contains crisis indicators.
+Follow the CRISIS PROTOCOL exactly as specified above.
+Step 1 first: acknowledge with warmth before anything else.
+Do NOT skip to resources immediately.
+Do NOT show alarm or panic in your response.
+Stay calm, warm, and present.
+"""
+            system_prompt = system_prompt + crisis_injection
+
+        raw_messages = context.get("current_messages", [])
+        ai_messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        for msg in raw_messages:
+            ai_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
+        if ai_messages and ai_messages[-1]["role"] != "user":
+            ai_messages.append({
+                "role": "user",
+                "content": payload.content
+            })
+
+        logger.info(
+            f"Sending {len(ai_messages)} messages to OpenAI "
+            f"(1 system + {len(ai_messages)-1} conversation)"
+        )
 
         completion = await client.chat.completions.create(
             model="gpt-4o-mini", messages=ai_messages, temperature=0.75, max_tokens=1000
@@ -123,9 +192,60 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
             "session_id": payload.session_id, "role": "user", "content": payload.content
         }).execute()
 
+        is_crisis = detect_crisis(payload.content)
+        if is_crisis:
+            logger.warning(
+                f"CRISIS DETECTED for user {user.id}: "
+                f"{payload.content[:50]}..."
+            )
+            try:
+                supabase.table("memory_notes").insert({
+                    "user_id": user.id,
+                    "note": f"[CRISIS FLAG] Detected in message: "
+                            f"{payload.content[:200]}",
+                    "tags": ["crisis_flag"],
+                    "source_session_id": payload.session_id,
+                }).execute()
+            except Exception as ce:
+                logger.error(f"Crisis logging failed: {ce}")
+
         context = await build_context(user.id, payload.session_id)
         system_prompt = build_system_prompt(context)
-        ai_messages = [{"role": "system", "content": system_prompt}] + (context.get("current_messages") or [])
+
+        if is_crisis:
+            crisis_injection = """
+
+⚠️ URGENT — CRISIS DETECTED ⚠️
+The user's last message contains crisis indicators.
+Follow the CRISIS PROTOCOL exactly as specified above.
+Step 1 first: acknowledge with warmth before anything else.
+Do NOT skip to resources immediately.
+Do NOT show alarm or panic in your response.
+Stay calm, warm, and present.
+"""
+            system_prompt = system_prompt + crisis_injection
+
+        raw_messages = context.get("current_messages", [])
+        ai_messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        for msg in raw_messages:
+            ai_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
+        if ai_messages and ai_messages[-1]["role"] != "user":
+            ai_messages.append({
+                "role": "user",
+                "content": payload.content
+            })
+
+        logger.info(
+            f"Sending {len(ai_messages)} messages to OpenAI "
+            f"(1 system + {len(ai_messages)-1} conversation)"
+        )
         agent_context = {
             "user_id": user.id,
             "session_id": payload.session_id,
@@ -173,42 +293,11 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
 
                 await increment_message_count(user.id)
 
-                # Run memory extraction in background
+                # Create task for background memory extraction
                 if full_content:
                     asyncio.create_task(
                         extract_memory(user.id, payload.session_id, payload.content, full_content)
                     )
-
-                # Crisis flag check — filter in Python, not with LIKE on array column
-                try:
-                    crisis_res = supabase.table("memory_notes")\
-                        .select("note, tags")\
-                        .eq("source_session_id", payload.session_id)\
-                        .eq("user_id", user.id)\
-                        .order("created_at", desc=True)\
-                        .limit(10).execute()
-
-                    has_crisis = any(
-                        isinstance(n.get("tags"), list) and "crisis_flag" in n["tags"]
-                        for n in (crisis_res.data or [])
-                    )
-
-                    if has_crisis:
-                        follow_up = (
-                            "\n\n---\nSol wants you to know: if things ever feel too heavy "
-                            "to carry alone, you don't have to. Reaching out to someone trained "
-                            "to help is a sign of strength, not weakness.\n\n"
-                            "**iCall (India):** 9152987821\n"
-                            "**Vandrevala Foundation:** 1860-2662-345 (24/7)\n"
-                            "**iCharity (Kerala):** 0484-2361161"
-                        )
-                        supabase.table("messages").insert({
-                            "session_id": payload.session_id,
-                            "role": "assistant",
-                            "content": follow_up
-                        }).execute()
-                except Exception as crisis_err:
-                    logger.warning(f"Crisis check failed (non-fatal): {crisis_err}")
 
             except Exception as e:
                 logger.error(f"event_generator crashed for user {user.id}: {e}", exc_info=True)
