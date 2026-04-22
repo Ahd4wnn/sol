@@ -32,7 +32,7 @@ def detect_crisis(text: str) -> bool:
     text_lower = text.lower()
     return any(keyword in text_lower for keyword in CRISIS_KEYWORDS)
 
-logger = logging.getLogger("sol")
+
 
 def extract_and_strip_feedback(content: str) -> tuple[str, dict | None]:
     pattern = r'\[FEEDBACK::([^:]+)::([^:]+)::([^\]]+)\]'
