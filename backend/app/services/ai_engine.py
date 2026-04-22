@@ -52,94 +52,111 @@ def build_system_prompt(context: dict) -> str:
     relationships = context.get("relationship_notes") or []
     session_meta = context.get("session_metadata") or {}
 
-    # Therapist settings
     settings = user_prof.get("therapist_settings") or {}
     if not isinstance(settings, dict):
         settings = {}
 
-    therapist_tone = settings.get("therapist_tone", "Like a warm friend")
+    therapist_tone = settings.get(
+        "therapist_tone", "Like a warm friend"
+    )
     response_length = settings.get("response_length", "Balanced")
     therapist_name = TONE_TO_NAME.get(therapist_tone, "Sol")
+    preferred_name = (
+        user_prof.get("preferred_name") or "friend"
+    ).strip()
 
-    # User basics
-    preferred_name = user_prof.get("preferred_name") or "you"
-
-    # Psychological profile — compressed to one line each
+    # Psychological profile
     attachment = profile.get("attachment_style", "unknown")
     neuroticism = profile.get("neuroticism_score", 3)
     core_belief = profile.get("core_belief_valence", "unknown")
-    therapy_pref = profile.get("therapy_style_preference", "person_centered")
+    therapy_pref = profile.get(
+        "therapy_style_preference", "person_centered"
+    )
     stressors = profile.get("primary_stressor_domains") or []
     expression = profile.get("emotional_expression_style", "unknown")
     coping = profile.get("coping_style", "unknown")
-    free_text = profile.get("free_text_reflection")
+    free_text = profile.get("free_text_reflection", "")
     flag_care = profile.get("flag_needs_care", False)
 
-    # Session context
+    # Session
     mood = session_meta.get("mood_before", "")
     mood_word = session_meta.get("mood_word", "")
     opening = session_meta.get("opening_context", "")
 
-    # Build compressed profile block
-    profile_lines = [
-        f"Attachment: {attachment}",
-        f"Neuroticism: {neuroticism}/5",
-        f"Self-belief: {core_belief}",
-        f"Therapy style: {therapy_pref}",
-        f"Stressors: {', '.join(stressors) if stressors else 'unknown'}",
-        f"Expression: {expression}",
-        f"Coping: {coping}",
-    ]
-    if free_text:
-        profile_lines.append(f'Their words: "{free_text[:100]}"')
-    if flag_care:
-        profile_lines.append(
-            "⚠ Expressed feeling like a burden. Extra warmth."
-        )
-
-    rel_block = (
-        "\n".join(f"- {r}" for r in relationships[:10])
-        if relationships
-        else "None yet."
+    # Relationships block
+    rel_text = (
+        "\n".join(f"- {r}" for r in relationships[:8])
+        if relationships else "None known yet."
     )
 
-    session_block = ""
-    if opening:
-        session_block = (
-            f"\nSession start — mood: {mood}/10, "
-            f"word: '{mood_word}'\n"
-            f"They said: \"{opening[:200]}\"\n"
-            f"Acknowledge this directly. Do not ask them to repeat it."
-        )
+    # Life context
+    life_situation = user_prof.get("current_situation", "")
+    life_goal = user_prof.get("life_goal", "")
+    persistent = user_prof.get("persistent_context", "")
 
-    # Get archetype-specific instructions (compressed)
+    opening_block = ""
+    if opening:
+        opening_block = f"""
+SESSION OPENING (they already told you this — do not ask again):
+Mood: {mood}/10 | Word: "{mood_word}"
+What they said: "{opening[:300]}"
+Your first response must address this directly.
+"""
+
     archetype_hint = ARCHETYPE_HINTS.get(therapist_tone, "")
 
-    prompt = f"""You are {therapist_name}, an AI therapist for college students.
+    prompt = f"""You are {therapist_name} — an AI therapist for college students.
+You are warm, perceptive, and present. You are NOT a chatbot.
+You speak like a real person who genuinely cares.
 
-IDENTITY: Warm, perceptive, present. Not a chatbot — a trusted presence.
-RESPONSE LENGTH: {response_length}. Short sentences. One question max per response.
-CALL THEM: {preferred_name}
-
-PROFILE:
-{chr(10).join(profile_lines)}
+WHO YOU'RE TALKING TO:
+Name: {preferred_name}
+Attachment style: {attachment}
+Neuroticism: {neuroticism}/5 (higher = more emotionally reactive)
+Core self-belief: {core_belief}
+Preferred style: {therapy_pref}
+Main stressors: {', '.join(stressors) if stressors else 'unknown'}
+Emotional expression: {expression}
+Coping pattern: {coping}
+{f'Their own words about themselves: "{free_text[:150]}"' if free_text else ''}
+{f'Life situation: {life_situation[:150]}' if life_situation else ''}
+{f'Working toward: {life_goal[:100]}' if life_goal else ''}
+{f'Always keep in mind: {persistent[:150]}' if persistent else ''}
+{'⚠ Has expressed feeling like a burden. Lead with extra warmth.' if flag_care else ''}
 
 PEOPLE IN THEIR LIFE:
-{rel_block}
-{session_block}
-
-RULES (non-negotiable):
-- One question per response. Never two.
-- Never repeat a question already asked this session.
-- Never ask how they feel if they already told you.
-- Acknowledge feeling before offering perspective.
-- No bullet points. No lists. Flowing prose only.
-- Short. Warm. Real.
+{rel_text}
+{opening_block}
+HOW TO RESPOND:
+- Response length: {response_length}
+- Read the ENTIRE conversation before responding
+- Reference what they said earlier — show you were listening
+- Never ask a question you already asked this session
+- Never ask how they feel if they already told you
+- One question per response maximum. Never two.
+- Acknowledge the feeling BEFORE offering any perspective
+- No bullet points. No lists. Warm flowing prose only.
+- Short sentences. Real words. Human tone.
+- If they said something earlier that connects to what they're
+  saying now, mention it: "Earlier you mentioned X — this
+  feels connected."
+- Do not start responses with "I" — start with their name,
+  an acknowledgment, or a direct response to what they said
 {archetype_hint}
 
-CRISIS: If user expresses suicidal intent or self-harm, provide:
-iCall: 9152987821 | Vandrevala: 1860-2662-345 | NIMHANS: 080-46110007
-Acknowledge first. Resources second. Stay in conversation.
+WHAT GREAT THERAPY SOUNDS LIKE:
+- "That's the third time you've mentioned your dad — what's
+  that relationship actually like?"
+- "You said you're fine but everything you've described
+  sounds exhausting."
+- "Earlier you said X. Now you're saying Y. What shifted?"
+- "You keep saying 'I should' — whose voice is that?"
+
+CRISIS PROTOCOL:
+If the user expresses suicidal intent or self-harm:
+Acknowledge warmly first. Never redirect immediately.
+Then provide: iCall 9152987821 | Vandrevala 1860-2662-345
+Stay in the conversation after giving resources.
 
 FEEDBACK: If user criticises Sol, acknowledge genuinely, ask what would help,
 then append [FEEDBACK::category::sentiment::quote] at end of response.

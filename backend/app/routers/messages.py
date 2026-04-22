@@ -181,26 +181,42 @@ Stay in the conversation — do NOT abandon them after giving resources.
             system_prompt = system_prompt + crisis_injection
 
         raw_messages = context.get("current_messages", [])
-        ai_messages = [
-            {"role": "system", "content": system_prompt}
-        ]
+
+        # Deduplicate — the user's message was saved to DB before
+        # build_context, so it's already in raw_messages
+        already_included = (
+            raw_messages and
+            raw_messages[-1].get("role") == "user" and
+            raw_messages[-1].get("content", "").strip() ==
+            payload.content.strip()
+        )
+
+        ai_messages = [{"role": "system", "content": system_prompt}]
 
         for msg in raw_messages:
+            if not msg.get("content", "").strip():
+                continue
             ai_messages.append({
                 "role": msg["role"],
                 "content": msg["content"]
             })
 
-        if ai_messages and ai_messages[-1]["role"] != "user":
+        # If the current message was NOT included (edge case)
+        if not already_included:
             ai_messages.append({
                 "role": "user",
                 "content": payload.content
             })
 
         logger.info(
-            f"Sending {len(ai_messages)} messages to OpenAI "
-            f"(1 system + {len(ai_messages)-1} conversation)"
+            f"AI messages: {len(ai_messages)} total "
+            f"({len(ai_messages)-1} conversation turns)"
         )
+        for msg in ai_messages[-3:]:
+            logger.info(
+                f"  [{msg['role']}]: "
+                f"{msg['content'][:60]}..."
+            )
 
         completion = await client.chat.completions.create(
             model="gpt-4o-mini", messages=ai_messages, temperature=0.75, max_tokens=1000
@@ -340,26 +356,44 @@ Stay in the conversation — do NOT abandon them after giving resources.
             system_prompt = system_prompt + crisis_injection
 
         raw_messages = context.get("current_messages", [])
-        ai_messages = [
-            {"role": "system", "content": system_prompt}
-        ]
+
+        # Deduplicate — the user's message was saved to DB before
+        # build_context, so it's already in raw_messages
+        already_included = (
+            raw_messages and
+            raw_messages[-1].get("role") == "user" and
+            raw_messages[-1].get("content", "").strip() ==
+            payload.content.strip()
+        )
+
+        ai_messages = [{"role": "system", "content": system_prompt}]
 
         for msg in raw_messages:
+            if not msg.get("content", "").strip():
+                continue
             ai_messages.append({
                 "role": msg["role"],
                 "content": msg["content"]
             })
 
-        if ai_messages and ai_messages[-1]["role"] != "user":
+        # If the current message was NOT included (edge case)
+        if not already_included:
             ai_messages.append({
                 "role": "user",
                 "content": payload.content
             })
 
         logger.info(
-            f"Sending {len(ai_messages)} messages to OpenAI "
-            f"(1 system + {len(ai_messages)-1} conversation)"
+            f"AI messages: {len(ai_messages)} total "
+            f"({len(ai_messages)-1} conversation turns)"
         )
+        # Log the last 3 messages for debugging
+        for msg in ai_messages[-3:]:
+            logger.info(
+                f"  [{msg['role']}]: "
+                f"{msg['content'][:60]}..."
+            )
+
         agent_context = {
             "user_id": user.id,
             "session_id": payload.session_id,

@@ -1,11 +1,12 @@
-const post = {
-  slug: "how-to-stop-overthinking-before-sleep",
-  title: "How to Stop Overthinking Before Sleep (What Actually Works)",
-  description: "Your brain won't shut up at night. Here's why it happens and what college students can actually do about it.",
-  date: "2026-04-22",
-  tags: ["overthinking", "sleep", "anxiety"],
-  readTime: 5,
-  content: `
+---
+title: "How to Stop Overthinking Before Sleep (What Actually Works)"
+slug: how-to-stop-overthinking-before-sleep
+description: "Your brain won't shut up at night. Here's why it happens and what college students can actually do about it."
+date: 2026-04-22
+tags: [overthinking, sleep, anxiety]
+readTime: 5
+---
+
 ## Your brain is loudest when everything else goes quiet.
 
 You get into bed. You're tired. Your body wants to sleep. But your brain? Your brain has other plans.
@@ -63,7 +64,3 @@ If racing thoughts at night are happening every night, if they're accompanied by
 **iCall India:** 9152987821 (Mon–Sat, 8am–10pm)
 
 Your brain isn't broken. It's just working overtime. And it deserves some rest.
-  `
-}
-
-export default post

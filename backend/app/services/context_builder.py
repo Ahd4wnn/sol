@@ -25,13 +25,26 @@ async def build_context(user_id: str, session_id: str) -> dict:
             ) or {}
 
         # 3. Current session messages ONLY
-        # Fetch ALL messages in this session in chronological order
+        # CRITICAL: desc=False = oldest first = chronological order
+        # This is what the AI needs to understand the conversation
         msgs_res = supabase.table("messages")\
-            .select("role, content")\
+            .select("role, content, created_at")\
             .eq("session_id", session_id)\
-            .order("created_at", asc=True)\
+            .order("created_at", desc=False)\
             .execute()
-        current_messages = msgs_res.data or []
+
+        current_messages = []
+        for msg in (msgs_res.data or []):
+            if msg.get("content", "").strip():  # skip empty
+                current_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+
+        logger.info(
+            f"Fetched {len(current_messages)} messages for session "
+            f"{session_id} in chronological order"
+        )
 
         # 4. Current session metadata
         session_res = supabase.table("therapy_sessions")\

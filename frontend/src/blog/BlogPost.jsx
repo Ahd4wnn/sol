@@ -1,133 +1,13 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import posts from './posts/index.js'
-
-// Simple markdown to HTML converter
-// Handles: ## headings, **bold**, [links](url), paragraphs
-function renderMarkdown(md) {
-  const lines = md.trim().split('\n')
-  const html = []
-  let i = 0
-
-  while (i < lines.length) {
-    const line = lines[i].trim()
-
-    if (!line) { i++; continue }
-
-    // H2
-    if (line.startsWith('## ')) {
-      html.push(
-        <h2 key={i} style={{
-          fontFamily: 'Fraunces, serif', fontWeight: 300,
-          fontSize: 'clamp(20px, 3vw, 26px)',
-          color: '#1A1714', marginTop: 40, marginBottom: 12,
-          lineHeight: 1.25,
-        }}>
-          {line.slice(3)}
-        </h2>
-      )
-      i++; continue
-    }
-
-    // H3
-    if (line.startsWith('### ')) {
-      html.push(
-        <h3 key={i} style={{
-          fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
-          fontSize: 18, color: '#1A1714',
-          marginTop: 28, marginBottom: 8,
-        }}>
-          {line.slice(4)}
-        </h3>
-      )
-      i++; continue
-    }
-
-    // Regular paragraph with inline formatting
-    html.push(
-      <p key={i} style={{
-        fontSize: 16, color: '#4A4541',
-        lineHeight: 1.8, marginBottom: 16,
-      }}>
-        {renderInline(line)}
-      </p>
-    )
-    i++
-  }
-
-  return html
-}
-
-function renderInline(text) {
-  // Handle **bold**, [link](url), and plain text
-  const parts = []
-  let remaining = text
-  let key = 0
-
-  while (remaining.length > 0) {
-    // Bold
-    const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
-    // Link
-    const linkMatch = remaining.match(/\[(.+?)\]\((.+?)\)/)
-
-    // Find which comes first
-    const boldIdx = boldMatch ? remaining.indexOf(boldMatch[0]) : Infinity
-    const linkIdx = linkMatch ? remaining.indexOf(linkMatch[0]) : Infinity
-
-    if (boldMatch && boldIdx <= linkIdx) {
-      if (boldIdx > 0) {
-        parts.push(
-          <span key={key++}>{remaining.slice(0, boldIdx)}</span>
-        )
-      }
-      parts.push(
-        <strong key={key++} style={{ color: '#1A1714', fontWeight: 600 }}>
-          {boldMatch[1]}
-        </strong>
-      )
-      remaining = remaining.slice(boldIdx + boldMatch[0].length)
-    } else if (linkMatch && linkIdx < Infinity) {
-      if (linkIdx > 0) {
-        parts.push(
-          <span key={key++}>{remaining.slice(0, linkIdx)}</span>
-        )
-      }
-      const isInternal = linkMatch[2].startsWith('/')
-      parts.push(
-        isInternal ? (
-          <Link
-            key={key++}
-            to={linkMatch[2]}
-            style={{ color: '#C96B2E', textDecoration: 'underline' }}
-          >
-            {linkMatch[1]}
-          </Link>
-        ) : (
-          <a
-            key={key++}
-            href={linkMatch[2]}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#C96B2E', textDecoration: 'underline' }}
-          >
-            {linkMatch[1]}
-          </a>
-        )
-      )
-      remaining = remaining.slice(linkIdx + linkMatch[0].length)
-    } else {
-      parts.push(<span key={key++}>{remaining}</span>)
-      break
-    }
-  }
-
-  return parts
-}
 
 export default function BlogPost() {
   const { slug } = useParams()
-  const [postModule, setPostModule] = useState(null)
+  const [postContent, setPostContent] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const meta = posts.find(p => p.slug === slug)
@@ -135,10 +15,15 @@ export default function BlogPost() {
   useEffect(() => {
     if (!meta) { setLoading(false); return }
 
-    // Dynamic import of post content
-    import(`./posts/${slug}.js`)
+    // Dynamic import the .md file as raw string
+    import(`./posts/${slug}.md?raw`)
       .then(mod => {
-        setPostModule(mod.default)
+        // Strip frontmatter (everything between --- and ---)
+        const raw = mod.default
+        const withoutFrontmatter = raw.replace(
+          /^---[\s\S]*?---\n/, ''
+        ).trim()
+        setPostContent(withoutFrontmatter)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -153,7 +38,7 @@ export default function BlogPost() {
     }}>Loading...</div>
   )
 
-  if (!meta || !postModule) {
+  if (!meta || !postContent) {
     return <Navigate to="/blog" replace />
   }
 
@@ -251,8 +136,93 @@ export default function BlogPost() {
           paddingBottom: 32,
         }}>{meta.description}</p>
 
-        {/* Content */}
-        <div>{renderMarkdown(postModule.content)}</div>
+        {/* Content — rendered from markdown */}
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            h2: ({children}) => (
+              <h2 style={{
+                fontFamily: 'Fraunces, serif',
+                fontWeight: 300,
+                fontSize: 'clamp(20px, 3vw, 26px)',
+                color: '#1A1714',
+                marginTop: 40,
+                marginBottom: 12,
+                lineHeight: 1.25,
+              }}>{children}</h2>
+            ),
+            h3: ({children}) => (
+              <h3 style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontWeight: 600,
+                fontSize: 18,
+                color: '#1A1714',
+                marginTop: 28,
+                marginBottom: 8,
+              }}>{children}</h3>
+            ),
+            p: ({children}) => (
+              <p style={{
+                fontSize: 16,
+                color: '#4A4541',
+                lineHeight: 1.8,
+                marginBottom: 18,
+              }}>{children}</p>
+            ),
+            strong: ({children}) => (
+              <strong style={{
+                color: '#1A1714',
+                fontWeight: 600,
+              }}>{children}</strong>
+            ),
+            a: ({href, children}) => {
+              const isInternal = href?.startsWith('/')
+              return isInternal ? (
+                <Link to={href} style={{
+                  color: '#C96B2E',
+                  textDecoration: 'underline',
+                }}>{children}</Link>
+              ) : (
+                <a href={href} target="_blank" rel="noopener noreferrer"
+                   style={{ color: '#C96B2E', textDecoration: 'underline' }}>
+                  {children}
+                </a>
+              )
+            },
+            ul: ({children}) => (
+              <ul style={{
+                paddingLeft: 20,
+                marginBottom: 18,
+              }}>{children}</ul>
+            ),
+            li: ({children}) => (
+              <li style={{
+                fontSize: 16,
+                color: '#4A4541',
+                lineHeight: 1.8,
+                marginBottom: 4,
+              }}>{children}</li>
+            ),
+            blockquote: ({children}) => (
+              <blockquote style={{
+                borderLeft: '3px solid #C96B2E',
+                paddingLeft: 16,
+                marginLeft: 0,
+                fontStyle: 'italic',
+                color: '#6B6560',
+              }}>{children}</blockquote>
+            ),
+            hr: () => (
+              <hr style={{
+                border: 'none',
+                borderTop: '1px solid #E8E3DD',
+                margin: '32px 0',
+              }} />
+            ),
+          }}
+        >
+          {postContent}
+        </ReactMarkdown>
 
         {/* Tags */}
         <div style={{
