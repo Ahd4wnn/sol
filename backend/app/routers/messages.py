@@ -109,7 +109,11 @@ async def verify_session(session_id: str, user_id: str):
 
 
 @router.post("/send")
-async def send_message(payload: SendMessageRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
+async def send_message(
+    payload: SendMessageRequest,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user)
+):
     await verify_session(payload.session_id, user.id)
 
     limit_check = await check_can_send_message(user.id)
@@ -126,9 +130,50 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
         )
 
     try:
+        # Step 1: Save user message to DB
         supabase.table("messages").insert({
-            "session_id": payload.session_id, "role": "user", "content": payload.content
+            "session_id": payload.session_id,
+            "role": "user",
+            "content": payload.content
         }).execute()
+
+        # Step 2: Fetch ALL previous messages from DB
+        history_res = supabase.table("messages")\
+            .select("role, content, created_at")\
+            .eq("session_id", payload.session_id)\
+            .order("created_at", desc=False)\
+            .execute()
+
+        db_messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in (history_res.data or [])
+            if m.get("content", "").strip()
+        ]
+
+        # Step 3: Build conversation array manually
+        conversation = []
+        current_msg = {
+            "role": "user",
+            "content": payload.content
+        }
+
+        already_in_db = (
+            db_messages and
+            db_messages[-1]["role"] == "user" and
+            db_messages[-1]["content"].strip() ==
+            payload.content.strip()
+        )
+
+        if already_in_db:
+            conversation = db_messages
+        else:
+            conversation = db_messages + [current_msg]
+
+        logger.info(
+            f"Conversation has {len(conversation)} messages. "
+            f"Last message: [{conversation[-1]['role']}]: "
+            f"{conversation[-1]['content'][:50]}"
+        )
 
         crisis_level = detect_crisis_level(payload.content)
 
@@ -165,12 +210,19 @@ async def send_message(payload: SendMessageRequest, background_tasks: Background
             except Exception as ce:
                 logger.error(f"Crisis logging failed: {ce}")
 
+        # Step 4: Build context
         context = await build_context(user.id, payload.session_id)
+        
+        # Step 5: Build system prompt
         system_prompt = build_system_prompt(context)
+
+        # Step 6: Build final AI messages array
+        ai_messages = [
+            {"role": "system", "content": system_prompt}
+        ] + conversation
 
         if crisis_level == "moderate":
             crisis_injection = """
-
 ⚠️ URGENT — CRISIS DETECTED ⚠️
 The user's last message contains crisis indicators.
 Acknowledge with full warmth and zero judgment first.
@@ -178,39 +230,11 @@ Then gently provide these resources:
 iCall: 9152987821 | Vandrevala: 1860-2662-345 (24/7) | NIMHANS: 080-46110007
 Stay in the conversation — do NOT abandon them after giving resources.
 """
-            system_prompt = system_prompt + crisis_injection
-
-        raw_messages = context.get("current_messages", [])
-
-        # Deduplicate — the user's message was saved to DB before
-        # build_context, so it's already in raw_messages
-        already_included = (
-            raw_messages and
-            raw_messages[-1].get("role") == "user" and
-            raw_messages[-1].get("content", "").strip() ==
-            payload.content.strip()
-        )
-
-        ai_messages = [{"role": "system", "content": system_prompt}]
-
-        for msg in raw_messages:
-            if not msg.get("content", "").strip():
-                continue
-            ai_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
-
-        # If the current message was NOT included (edge case)
-        if not already_included:
-            ai_messages.append({
-                "role": "user",
-                "content": payload.content
-            })
+            ai_messages[0]["content"] += crisis_injection
 
         logger.info(
-            f"AI messages: {len(ai_messages)} total "
-            f"({len(ai_messages)-1} conversation turns)"
+            f"Sending to OpenAI: {len(ai_messages)} messages "
+            f"(1 system + {len(conversation)} conversation)"
         )
         for msg in ai_messages[-3:]:
             logger.info(
@@ -256,27 +280,101 @@ Stay in the conversation — do NOT abandon them after giving resources.
 
 
 @router.post("/send-stream")
-async def send_message_stream(payload: SendMessageRequest, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
+async def send_message_stream(
+    payload: SendMessageRequest,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user)
+):
     await verify_session(payload.session_id, user.id)
 
-    limit_check = await check_can_send_message(user.id)
-    if not limit_check["allowed"]:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": True,
-                "code": "TRIAL_EXCEEDED",
-                "message": "You've used all 20 free messages.",
-                "messages_used": limit_check["messages_used"],
-                "limit": limit_check["limit"]
-            }
-        )
-
     try:
-        supabase.table("messages").insert({
-            "session_id": payload.session_id, "role": "user", "content": payload.content
+        # Step 1: Save user message to DB
+        save_result = supabase.table("messages").insert({
+            "session_id": payload.session_id,
+            "role": "user",
+            "content": payload.content
         }).execute()
 
+        # Step 2: Fetch ALL previous messages from DB
+        # (may or may not include the message we just saved)
+        history_res = supabase.table("messages")\
+            .select("role, content, created_at")\
+            .eq("session_id", payload.session_id)\
+            .order("created_at", desc=False)\
+            .execute()
+
+        db_messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in (history_res.data or [])
+            if m.get("content", "").strip()
+        ]
+
+        # Step 3: Build conversation array manually
+        # This guarantees the current message is included
+        # even if the DB hasn't reflected it yet
+        conversation = []
+        current_msg = {
+            "role": "user",
+            "content": payload.content
+        }
+
+        # Check if current message is already in db_messages
+        already_in_db = (
+            db_messages and
+            db_messages[-1]["role"] == "user" and
+            db_messages[-1]["content"].strip() ==
+            payload.content.strip()
+        )
+
+        if already_in_db:
+            # DB has it — use DB messages as-is (correct order)
+            conversation = db_messages
+        else:
+            # DB doesn't have it yet — append manually
+            conversation = db_messages + [current_msg]
+
+        logger.info(
+            f"Conversation has {len(conversation)} messages. "
+            f"Last message: [{conversation[-1]['role']}]: "
+            f"{conversation[-1]['content'][:50]}"
+        )
+
+        # Step 4: Build context (for profile/settings only,
+        # NOT for messages — we handle messages above)
+        context = await build_context(
+            user.id, payload.session_id
+        )
+
+        # Step 5: Build system prompt
+        system_prompt = build_system_prompt(context)
+
+        # Step 6: Build final AI messages array
+        # System prompt + full conversation in order
+        ai_messages = [
+            {"role": "system", "content": system_prompt}
+        ] + conversation
+
+        logger.info(
+            f"Sending to OpenAI: {len(ai_messages)} messages "
+            f"(1 system + {len(conversation)} conversation)"
+        )
+
+        # Log full conversation for debugging
+        for i, msg in enumerate(conversation):
+            logger.info(
+                f"  msg[{i}] [{msg['role']}]: "
+                f"{msg['content'][:80]}"
+            )
+
+        agent_context = {
+            "user_id": user.id,
+            "session_id": payload.session_id,
+            "personality_profile": context.get(
+                "personality_profile", {}
+            )
+        }
+
+        # Detect crisis level
         crisis_level = detect_crisis_level(payload.content)
 
         if crisis_level == "severe":
@@ -323,7 +421,6 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
                 media_type="text/event-stream"
             )
 
-        # For moderate crisis — log and inject instructions into prompt
         if crisis_level == "moderate":
             logger.warning(
                 f"MODERATE CRISIS: user={user.id} "
@@ -338,14 +435,8 @@ async def send_message_stream(payload: SendMessageRequest, background_tasks: Bac
                 }).execute()
             except Exception as e:
                 logger.error(f"Crisis logging failed: {e}")
-
-        # Continue with normal AI flow
-        context = await build_context(user.id, payload.session_id)
-        system_prompt = build_system_prompt(context)
-
-        if crisis_level == "moderate":
+                
             crisis_injection = """
-
 ⚠️ URGENT — CRISIS DETECTED ⚠️
 The user's last message contains crisis indicators.
 Acknowledge with full warmth and zero judgment first.
@@ -353,106 +444,80 @@ Then gently provide these resources:
 iCall: 9152987821 | Vandrevala: 1860-2662-345 (24/7) | NIMHANS: 080-46110007
 Stay in the conversation — do NOT abandon them after giving resources.
 """
-            system_prompt = system_prompt + crisis_injection
+            ai_messages[0]["content"] += crisis_injection
 
-        raw_messages = context.get("current_messages", [])
-
-        # Deduplicate — the user's message was saved to DB before
-        # build_context, so it's already in raw_messages
-        already_included = (
-            raw_messages and
-            raw_messages[-1].get("role") == "user" and
-            raw_messages[-1].get("content", "").strip() ==
-            payload.content.strip()
-        )
-
-        ai_messages = [{"role": "system", "content": system_prompt}]
-
-        for msg in raw_messages:
-            if not msg.get("content", "").strip():
-                continue
-            ai_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
-
-        # If the current message was NOT included (edge case)
-        if not already_included:
-            ai_messages.append({
-                "role": "user",
-                "content": payload.content
-            })
-
-        logger.info(
-            f"AI messages: {len(ai_messages)} total "
-            f"({len(ai_messages)-1} conversation turns)"
-        )
-        # Log the last 3 messages for debugging
-        for msg in ai_messages[-3:]:
-            logger.info(
-                f"  [{msg['role']}]: "
-                f"{msg['content'][:60]}..."
-            )
-
-        agent_context = {
-            "user_id": user.id,
-            "session_id": payload.session_id,
-            "personality_profile": context.get("personality_profile") or {}
-        }
-
+        # Stream response
         async def event_generator():
             full_content = ""
             try:
-                async for chunk in stream_sol_response(system_prompt, ai_messages, agent_context):
+                async for chunk in stream_sol_response(
+                    ai_messages[0]["content"], ai_messages, agent_context
+                ):
                     yield chunk
-                    # Track full content from delta chunks
                     if '"done": false' in chunk:
                         try:
-                            data_str = chunk.removeprefix("data: ").strip()
+                            data_str = chunk.removeprefix(
+                                "data: "
+                            ).strip()
                             parsed = json.loads(data_str)
                             full_content += parsed.get("delta", "")
                         except Exception:
                             pass
 
-                clean_content, feedback_data = extract_and_strip_feedback(full_content)
-
-                # Save assistant message to DB
+                # Save assistant response to DB
                 if full_content:
+                    clean_content, feedback_data = extract_and_strip_feedback(full_content)
+                    
                     supabase.table("messages").insert({
                         "session_id": payload.session_id,
                         "role": "assistant",
                         "content": clean_content
                     }).execute()
 
-                if feedback_data:
-                    try:
-                        supabase.table("feedback").insert({
-                            "user_id": user.id,
-                            "session_id": payload.session_id,
-                            "feedback_text": feedback_data["quote"],
-                            "sol_response": clean_content,
-                            "sentiment": feedback_data["sentiment"],
-                            "category": feedback_data["category"],
-                            "resolved": False
-                        }).execute()
-                        logger.info(f"Feedback captured: {feedback_data['category']} — {feedback_data['quote']}")
-                    except Exception as fe:
-                        logger.warning(f"Feedback save failed (non-fatal): {fe}")
+                    if feedback_data:
+                        try:
+                            supabase.table("feedback").insert({
+                                "user_id": user.id,
+                                "session_id": payload.session_id,
+                                "feedback_text": feedback_data["quote"],
+                                "sol_response": clean_content,
+                                "sentiment": feedback_data["sentiment"],
+                                "category": feedback_data["category"],
+                                "resolved": False
+                            }).execute()
+                            logger.info(f"Feedback captured: {feedback_data['category']} — {feedback_data['quote']}")
+                        except Exception as fe:
+                            logger.warning(f"Feedback save failed (non-fatal): {fe}")
 
-                await increment_message_count(user.id)
+                    await increment_message_count(user.id)
 
-                # Create task for background memory extraction
-                if full_content:
                     asyncio.create_task(
-                        extract_memory(user.id, payload.session_id, payload.content, full_content)
+                        extract_memory(
+                            user.id,
+                            payload.session_id,
+                            payload.content,
+                            clean_content
+                        )
                     )
 
             except Exception as e:
-                logger.error(f"event_generator crashed for user {user.id}: {e}", exc_info=True)
-                yield f"data: {json.dumps({'error': True, 'message': 'Something went wrong. Please try again.'})}\n\n"
+                logger.error(
+                    f"event_generator crashed: {e}",
+                    exc_info=True
+                )
+                yield f"data: {json.dumps({'error': True, 'message': 'Something went wrong.'})}\n\n"
 
-        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream"
+        )
 
     except Exception as e:
-        logger.error(f"send_message_stream setup failed for user {user.id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong.", "code": "SERVER_ERROR"})
+        logger.error(
+            f"send_message_stream setup failed: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": True, "message": "Something went wrong."}
+        )
