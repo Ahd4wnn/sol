@@ -49,6 +49,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap" rel="stylesheet">
 
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7865YC0T5P"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-7865YC0T5P', {
+        page_title: document.title,
+        page_location: window.location.href,
+      });
+    </script>
+
     <!-- Razorpay (existing in body, moving to head per user request or keep in body) -->
     <!-- The user request has Razorpay tag in head, so we add it here -->
     <!-- Actually user had it in body, user prompt has it in head -->

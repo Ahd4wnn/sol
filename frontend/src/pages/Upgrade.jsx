@@ -112,7 +112,7 @@ export default function Upgrade() {
           marginBottom: 12,
         }}>You've found your place here.</h1>
         <p style={{ color: '#6B6560', fontSize: 16, maxWidth: 420, margin: '0 auto' }}>
-          You've used your 20 free messages. Upgrade to keep going —
+          You've used your 10 free messages. Upgrade to keep going —
           Sol will remember everything you've shared.
         </p>
       </div>

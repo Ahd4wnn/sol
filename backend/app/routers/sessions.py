@@ -9,10 +9,41 @@ logger = logging.getLogger("sol")
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.post("/create")
-def create_session(payload: CreateSessionRequest, user=Depends(get_current_user)):
+async def create_session(payload: CreateSessionRequest, user=Depends(get_current_user)):
     try:
         supabase.table("profiles").upsert({"id": user.id}).execute()
-        
+
+        # Check subscription
+        from app.services.subscription_service import is_pro
+        user_is_pro = await is_pro(user.id)
+
+        # Check early member
+        profile_res = supabase.table("profiles")\
+            .select("is_early_member")\
+            .eq("id", user.id).limit(1).execute()
+        profile = (profile_res.data or [{}])[0]
+        is_early = profile.get("is_early_member", False)
+
+        # Free users: max 1 session
+        if not user_is_pro and not is_early:
+            session_count_res = supabase.table("therapy_sessions")\
+                .select("id", count="exact")\
+                .eq("user_id", user.id)\
+                .is_("deleted_at", "null")\
+                .execute()
+            session_count = session_count_res.count or 0
+
+            if session_count >= 1:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": True,
+                        "code": "SESSION_LIMIT_REACHED",
+                        "message": "Free plan includes 1 session.",
+                        "upgrade_required": True,
+                    }
+                )
+
         data = {
             "user_id": user.id,
             "title": payload.title,
@@ -22,6 +53,8 @@ def create_session(payload: CreateSessionRequest, user=Depends(get_current_user)
         }
         res = supabase.table("therapy_sessions").insert(data).execute()
         return res.data[0] if (hasattr(res, 'data') and len(res.data) > 0) else None
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"create_session failed for user {user.id}: {e}")
         raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})

@@ -124,7 +124,7 @@ async def send_message(
             detail={
                 "error": True,
                 "code": "TRIAL_EXCEEDED",
-                "message": "You've used all 20 free messages.",
+                "message": "You've used your 10 free messages.",
                 "messages_used": limit_check["messages_used"],
                 "limit": limit_check["limit"]
             }

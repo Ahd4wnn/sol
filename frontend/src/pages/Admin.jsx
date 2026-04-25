@@ -166,31 +166,179 @@ export default function Admin() {
           <div>
             <h2 style={{ fontFamily: 'Fraunces, serif', fontWeight: 300,
                         fontSize: 28, marginBottom: 24 }}>Overview</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                         gap: 16, marginBottom: 32 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                         gap: 14, marginBottom: 32 }}>
               {[
                 { label: 'Total Users', value: stats.users.total, color: '#C96B2E' },
-                { label: 'Pro Subscribers', value: stats.users.pro, color: '#3D7A5F' },
-                { label: 'Conversion Rate', value: `${stats.users.conversion_rate}%`, color: '#7B5EA7' },
+                { label: 'Pro Users', value: stats.users.pro, color: '#3D7A5F' },
+                { label: 'Free Users', value: stats.users.free, color: '#9E8E7E' },
+                { label: 'Early Members', value: stats.users.early_members, color: '#C96B2E' },
+                { label: 'Total Sessions', value: stats.usage.total_sessions, color: '#7B5EA7' },
+                { label: 'Total Messages', value: stats.usage.total_messages, color: '#C96B2E' },
+                { label: 'New Today', value: stats.growth?.new_today, color: '#3D7A5F' },
+                { label: 'New This Week', value: stats.growth?.new_week, color: '#3D7A5F' },
                 { label: 'MRR (est.)', value: `$${stats.revenue.monthly_recurring}`, color: '#C96B2E' },
-                { label: 'Total Revenue', value: `$${stats.revenue.total_collected}`, color: '#3D7A5F' },
-                { label: 'Monthly Subs', value: stats.revenue.monthly_subs, color: '#6B6560' },
-                { label: 'Yearly Subs', value: stats.revenue.yearly_subs, color: '#6B6560' },
-                { label: 'Total Sessions', value: stats.usage.total_sessions, color: '#6B6560' },
-                { label: 'Total Messages', value: stats.usage.total_messages, color: '#6B6560' },
                 { label: 'Open Feedback', value: stats.feedback.unresolved, color: '#C0392B' },
               ].map(stat => (
                 <div key={stat.label} style={{
-                  background: 'white', borderRadius: 16,
-                  border: '1px solid #E8E3DD', padding: '24px 20px',
+                  background: 'rgba(255,252,248,0.8)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(232,227,221,0.7)',
+                  borderRadius: 16,
+                  padding: '20px 18px',
                 }}>
-                  <div style={{ fontSize: 32, fontFamily: 'Fraunces, serif',
-                               fontWeight: 300, color: stat.color }}>
-                    {stat.value}
+                  <div style={{
+                    fontFamily: 'Fraunces, serif',
+                    fontWeight: 300,
+                    fontSize: 32,
+                    color: stat.color,
+                  }}>
+                    {stat.value?.toLocaleString?.() ?? stat.value ?? '—'}
                   </div>
-                  <div style={{ fontSize: 13, color: '#9E8E7E', marginTop: 4 }}>
+                  <div style={{
+                    fontSize: 12, color: '#9E8E7E', marginTop: 4,
+                  }}>
                     {stat.label}
                   </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Recent signups */}
+            <h3 style={{
+              fontFamily: 'Fraunces, serif', fontWeight: 300,
+              fontSize: 20, marginBottom: 16,
+            }}>Recent Signups</h3>
+
+            <div style={{
+              background: 'white',
+              borderRadius: 16,
+              border: '1px solid #E8E3DD',
+              overflow: 'hidden',
+              marginBottom: 32,
+            }}>
+              {(stats.recent_signups || []).length === 0 ? (
+                <div style={{
+                  padding: 24, textAlign: 'center',
+                  color: '#9E8E7E', fontSize: 14,
+                }}>No signups yet.</div>
+              ) : (
+                <table style={{
+                  width: '100%', borderCollapse: 'collapse',
+                }}>
+                  <thead>
+                    <tr style={{ background: '#F9F7F4' }}>
+                      {['Name', 'Plan', 'Joined'].map(h => (
+                        <th key={h} style={{
+                          padding: '10px 20px',
+                          textAlign: 'left',
+                          fontSize: 11,
+                          color: '#9E8E7E',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          borderBottom: '1px solid #E8E3DD',
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recent_signups.map((u, i) => (
+                      <tr key={u.id} style={{
+                        borderBottom: i < stats.recent_signups.length - 1
+                          ? '1px solid #F0EBE5' : 'none',
+                      }}>
+                        <td style={{
+                          padding: '12px 20px',
+                          fontSize: 14,
+                          fontWeight: 500,
+                          color: '#1A1714',
+                        }}>
+                          {u.preferred_name || u.full_name || '—'}
+                        </td>
+                        <td style={{ padding: '12px 20px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: u.is_early_member
+                              ? 'rgba(201,107,46,0.1)'
+                              : u.is_pro
+                                ? '#E8F5EF'
+                                : '#F0EBE5',
+                            color: u.is_early_member
+                              ? '#C96B2E'
+                              : u.is_pro
+                                ? '#3D7A5F'
+                                : '#9E8E7E',
+                          }}>
+                            {u.is_early_member
+                              ? 'Early'
+                              : u.is_pro
+                                ? 'Pro'
+                                : 'Free'}
+                          </span>
+                        </td>
+                        <td style={{
+                          padding: '12px 20px',
+                          fontSize: 13,
+                          color: '#9E8E7E',
+                        }}>
+                          {new Date(u.created_at)
+                            .toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Conversion stats */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 14,
+            }}>
+              {[
+                {
+                  label: 'Free → Pro Conversion',
+                  value: stats.users.conversion_rate
+                    ? `${stats.users.conversion_rate}%`
+                    : '—',
+                  sub: `${stats.users.pro} of ${stats.users.total} users`,
+                  color: '#3D7A5F',
+                },
+                {
+                  label: 'Avg Messages / User',
+                  value: stats.usage.avg_messages_per_user ?? '—',
+                  sub: 'across all users',
+                  color: '#C96B2E',
+                },
+              ].map(stat => (
+                <div key={stat.label} style={{
+                  background: 'rgba(255,252,248,0.8)',
+                  border: '1px solid rgba(232,227,221,0.7)',
+                  borderRadius: 16,
+                  padding: '20px 18px',
+                }}>
+                  <div style={{
+                    fontFamily: 'Fraunces, serif',
+                    fontWeight: 300,
+                    fontSize: 36,
+                    color: stat.color,
+                  }}>{stat.value}</div>
+                  <div style={{
+                    fontSize: 13, fontWeight: 500,
+                    color: '#1A1714', marginTop: 4,
+                  }}>{stat.label}</div>
+                  <div style={{
+                    fontSize: 12, color: '#9E8E7E', marginTop: 2,
+                  }}>{stat.sub}</div>
                 </div>
               ))}
             </div>

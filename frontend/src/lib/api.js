@@ -36,7 +36,6 @@ api.interceptors.request.use(async (config) => {
   try {
     const token = await getToken()
     if (token) config.headers.Authorization = `Bearer ${token}`
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
   } catch (err) {
     console.error('[API] Token fetch failed:', err)
   }
@@ -44,18 +43,14 @@ api.interceptors.request.use(async (config) => {
 })
 
 api.interceptors.response.use(
-  (response) => {
-    console.log(`[API] ✓ ${response.config.url} → ${response.status}`)
-    return response
-  },
+  (response) => response,
   (error) => {
     const status = error.response?.status
     const url = error.config?.url
-    const message = error.response?.data?.detail?.message
-      || error.response?.data?.message
-      || error.message
 
-    console.error(`[API] ✗ ${url} → ${status}: ${message}`)
+    if (!error.response) {
+      console.warn('[API] Network error — backend may be unreachable')
+    }
 
     if (status === 401) {
       tokenCache = { value: null, expiresAt: 0 }

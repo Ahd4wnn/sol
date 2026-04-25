@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import Landing from './pages/Landing';
@@ -31,10 +32,22 @@ const AuthRoute = ({ children }) => {
   return children;
 };
 
+function GATracker() {
+  const location = useLocation();
+  useEffect(() => {
+    if (typeof window.gtag !== 'function') return;
+    window.gtag('config', 'G-7865YC0T5P', {
+      page_path: location.pathname + location.search,
+    });
+  }, [location]);
+  return null;
+}
+
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
+        <GATracker />
         <NetworkStatus />
         <ToastProvider>
           <Routes>

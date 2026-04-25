@@ -18,6 +18,11 @@ def require_admin(user=Depends(get_current_user)):
 @router.get("/stats")
 async def get_stats(admin=Depends(require_admin)):
     try:
+        from datetime import timedelta
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0).isoformat()
+        week_start = (now - timedelta(days=7)).isoformat()
+
         # Total users
         users_res = supabase.table("profiles").select("id", count="exact").execute()
         total_users = users_res.count or 0
@@ -28,6 +33,12 @@ async def get_stats(admin=Depends(require_admin)):
             .in_("plan", ["pro_monthly", "pro_yearly"])\
             .in_("status", ["active", "gifted"]).execute()
         pro_users = pro_res.count or 0
+
+        # Early members
+        early_res = supabase.table("profiles")\
+            .select("id", count="exact")\
+            .eq("is_early_member", True).execute()
+        early_members = early_res.count or 0
 
         # Monthly vs yearly breakdown
         monthly_res = supabase.table("subscriptions")\
@@ -53,6 +64,7 @@ async def get_stats(admin=Depends(require_admin)):
         # Total messages
         messages_res = supabase.table("messages")\
             .select("id", count="exact").execute()
+        total_messages = messages_res.count or 0
 
         # Feedback stats
         feedback_res = supabase.table("feedback")\
@@ -60,11 +72,43 @@ async def get_stats(admin=Depends(require_admin)):
         feedback_data = feedback_res.data or []
         unresolved = sum(1 for f in feedback_data if not f.get("resolved"))
 
+        # New today
+        new_today_res = supabase.table("profiles")\
+            .select("id", count="exact")\
+            .gte("created_at", today_start).execute()
+        new_today = new_today_res.count or 0
+
+        # New this week
+        new_week_res = supabase.table("profiles")\
+            .select("id", count="exact")\
+            .gte("created_at", week_start).execute()
+        new_week = new_week_res.count or 0
+
+        # Avg messages per user
+        avg_messages = round(total_messages / total_users, 1) if total_users > 0 else 0
+
+        # Recent signups (last 20)
+        recent_res = supabase.table("profiles")\
+            .select("id, full_name, preferred_name, created_at, is_early_member")\
+            .order("created_at", desc=True)\
+            .limit(20).execute()
+
+        recent_signups = []
+        for p in (recent_res.data or []):
+            pro_check = supabase.table("subscriptions")\
+                .select("id")\
+                .eq("user_id", p["id"])\
+                .eq("status", "active")\
+                .limit(1).execute()
+            p["is_pro"] = bool(pro_check.data)
+            recent_signups.append(p)
+
         return {
             "users": {
                 "total": total_users,
                 "pro": pro_users,
-                "free": total_users - pro_users,
+                "free": total_users - pro_users - early_members,
+                "early_members": early_members,
                 "conversion_rate": round((pro_users / total_users * 100), 1) if total_users else 0
             },
             "revenue": {
@@ -75,12 +119,18 @@ async def get_stats(admin=Depends(require_admin)):
             },
             "usage": {
                 "total_sessions": sessions_res.count or 0,
-                "total_messages": messages_res.count or 0,
+                "total_messages": total_messages,
+                "avg_messages_per_user": avg_messages,
             },
             "feedback": {
                 "total": len(feedback_data),
                 "unresolved": unresolved,
-            }
+            },
+            "growth": {
+                "new_today": new_today,
+                "new_week": new_week,
+            },
+            "recent_signups": recent_signups,
         }
     except Exception as e:
         logger.error(f"admin stats failed: {e}", exc_info=True)

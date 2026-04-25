@@ -604,7 +604,7 @@ export default function Landing() {
                             fontWeight: 300, color: '#1A1714' }}>$0</span>
             </div>
             {[
-              '20 messages to try Sol',
+              '10 messages to try Sol',
               'Full onboarding + profiling',
               'Memory across sessions',
               'All therapist characters',

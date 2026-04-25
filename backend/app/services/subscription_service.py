@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger("sol")
 
-FREE_MESSAGE_LIMIT = 20
+FREE_MESSAGE_LIMIT = 10
 
 async def get_subscription(user_id: str) -> dict:
     res = supabase.table("subscriptions")\
@@ -52,7 +52,7 @@ async def check_can_send_message(user_id: str) -> dict:
     """
     Returns:
       { "allowed": True }
-      { "allowed": False, "reason": "trial_exceeded", "messages_used": 20, "limit": 20 }
+      { "allowed": False, "reason": "trial_exceeded", "messages_used": 10, "limit": 10 }
     """
     pro = await is_pro(user_id)
     if pro:

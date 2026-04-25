@@ -46,7 +46,7 @@ async def get_billing_status(user=Depends(get_current_user)):
             "plan": sub.get("plan", "free"),
             "status": sub.get("status", "active"),
             "messages_used": count,
-            "messages_limit": 20,
+            "messages_limit": 10,
             "is_pro": sub.get("plan") in ("pro_monthly", "pro_yearly")
                       and sub.get("status") in ("active", "gifted"),
             "period_end": sub.get("current_period_end"),

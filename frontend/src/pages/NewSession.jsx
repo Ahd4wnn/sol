@@ -42,6 +42,11 @@ export default function NewSession() {
       });
       navigate(`/session/${res.data.id}`);
     } catch (err) {
+      const code = err.response?.data?.detail?.code;
+      if (code === 'SESSION_LIMIT_REACHED') {
+        navigate('/upgrade');
+        return;
+      }
       console.error(err);
       setError('Failed to start session. Please try again.');
       setIsSubmitting(false);
