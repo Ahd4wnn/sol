@@ -17,6 +17,7 @@ from app.services.subscription_service import check_can_send_message, increment_
 
 logger = logging.getLogger("sol")
 
+
 SEVERE_CRISIS_KEYWORDS = [
     "going to commit suicide",
     "going to kill myself",
@@ -288,59 +289,51 @@ async def send_message_stream(
     await verify_session(payload.session_id, user.id)
 
     try:
-        # Step 1: Save user message to DB
-        save_result = supabase.table("messages").insert({
+        # Step 1: Save current user message to DB
+        supabase.table("messages").insert({
             "session_id": payload.session_id,
             "role": "user",
             "content": payload.content
         }).execute()
 
-        # Step 2: Fetch ALL previous messages from DB
-        # (may or may not include the message we just saved)
-        history_res = supabase.table("messages")\
+        # Step 2: Fetch ALL messages for this session from DB
+        # Use a small delay to handle Supabase replication lag
+        await asyncio.sleep(0.1)  # 100ms — enough for consistency
+
+        all_msgs_res = supabase.table("messages")\
             .select("role, content, created_at")\
             .eq("session_id", payload.session_id)\
             .order("created_at", desc=False)\
             .execute()
 
-        db_messages = [
-            {"role": m["role"], "content": m["content"]}
-            for m in (history_res.data or [])
-            if m.get("content", "").strip()
-        ]
+        db_messages = []
+        for m in (all_msgs_res.data or []):
+            content = m.get("content", "").strip()
+            role = m.get("role", "")
+            if content and role in ("user", "assistant"):
+                db_messages.append({
+                    "role": role,
+                    "content": content
+                })
 
-        # Step 3: Build conversation array manually
-        # This guarantees the current message is included
-        # even if the DB hasn't reflected it yet
-        conversation = []
-        current_msg = {
-            "role": "user",
-            "content": payload.content
-        }
+        logger.info(f"DB messages fetched: {len(db_messages)}")
 
-        # Check if current message is already in db_messages
-        already_in_db = (
-            db_messages and
-            db_messages[-1]["role"] == "user" and
-            db_messages[-1]["content"].strip() ==
-            payload.content.strip()
+        # Step 3: Ensure current message is in the array
+        # (handles edge case where 100ms wasn't enough)
+        last_msg = db_messages[-1] if db_messages else {}
+        current_already_included = (
+            last_msg.get("role") == "user" and
+            last_msg.get("content", "").strip() == payload.content.strip()
         )
 
-        if already_in_db:
-            # DB has it — use DB messages as-is (correct order)
-            conversation = db_messages
-        else:
-            # DB doesn't have it yet — append manually
-            conversation = db_messages + [current_msg]
+        if not current_already_included:
+            logger.warning("Current message not in DB yet — appending manually")
+            db_messages.append({
+                "role": "user",
+                "content": payload.content
+            })
 
-        logger.info(
-            f"Conversation has {len(conversation)} messages. "
-            f"Last message: [{conversation[-1]['role']}]: "
-            f"{conversation[-1]['content'][:50]}"
-        )
-
-        # Step 4: Build context (for profile/settings only,
-        # NOT for messages — we handle messages above)
+        # Step 4: Build context (for profile/settings only)
         context = await build_context(
             user.id, payload.session_id
         )
@@ -348,23 +341,14 @@ async def send_message_stream(
         # Step 5: Build system prompt
         system_prompt = build_system_prompt(context)
 
-        # Step 6: Build final AI messages array
-        # System prompt + full conversation in order
-        ai_messages = [
-            {"role": "system", "content": system_prompt}
-        ] + conversation
+        # Step 6: Build final messages array
+        ai_messages = [{"role": "system", "content": system_prompt}]
+        ai_messages.extend(db_messages)
 
         logger.info(
-            f"Sending to OpenAI: {len(ai_messages)} messages "
-            f"(1 system + {len(conversation)} conversation)"
+            f"Final ai_messages: {len(ai_messages)} "
+            f"(1 system + {len(db_messages)} conversation)"
         )
-
-        # Log full conversation for debugging
-        for i, msg in enumerate(conversation):
-            logger.info(
-                f"  msg[{i}] [{msg['role']}]: "
-                f"{msg['content'][:80]}"
-            )
 
         agent_context = {
             "user_id": user.id,
@@ -445,6 +429,15 @@ iCall: 9152987821 | Vandrevala: 1860-2662-345 (24/7) | NIMHANS: 080-46110007
 Stay in the conversation — do NOT abandon them after giving resources.
 """
             ai_messages[0]["content"] += crisis_injection
+
+        # CRITICAL DEBUG — verify full conversation is here
+        logger.info(f"=== CONVERSATION ARRAY ===")
+        logger.info(f"Total messages: {len(ai_messages)}")
+        for i, m in enumerate(ai_messages):
+            role = m.get('role', '?')
+            content = m.get('content', '')[:80]
+            logger.info(f"  [{i}] [{role}]: {content}")
+        logger.info(f"=== END CONVERSATION ===")
 
         # Stream response
         async def event_generator():

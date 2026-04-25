@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { SessionListSkeleton } from '../components/ui/Skeleton';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle } from 'lucide-react';
 import { api } from '../lib/axios';
 import { AppShell } from '../components/layout/AppShell';
 
 export default function Sessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,6 +26,20 @@ export default function Sessions() {
     };
     fetchSessions();
   }, []);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/api/sessions/${deleteTarget}`);
+      setSessions(prev => prev.filter(s => s.id !== deleteTarget));
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('Delete failed', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -73,13 +89,25 @@ export default function Sessions() {
                          </div>
                       </div>
                       
-                      <p className="text-sol-text-secondary leading-relaxed mb-6">
+                      <p className="text-sol-text-secondary leading-relaxed mb-4">
                         {session.summary || 'A session is waiting to be summarised. Let Sol review this conversation.'}
                       </p>
 
-                      <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
-                        <MessageCircle size={16} />
-                        <span>{session.message_count || 0} messages exchanged</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
+                          <MessageCircle size={16} />
+                          <span>{session.message_count || 0} messages exchanged</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(session.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-sm text-gray-400 hover:text-red-500 font-medium"
+                          style={{ fontFamily: 'DM Sans, sans-serif' }}
+                        >
+                          Delete
+                        </button>
                       </div>
                    </div>
                  </motion.div>
@@ -88,6 +116,53 @@ export default function Sessions() {
            )}
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-sol-text-primary/30 backdrop-blur-sm"
+              onClick={() => !isDeleting && setDeleteTarget(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center"
+            >
+              <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                <span className="text-red-500 text-xl">🗑</span>
+              </div>
+              <h3 className="text-xl font-display italic text-sol-text-primary mb-2">
+                Delete this session?
+              </h3>
+              <p className="text-sol-text-secondary text-sm mb-6">
+                This will permanently remove the session and all its messages. Your memories from this session will be kept.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-3 rounded-full font-medium text-sol-text-secondary hover:bg-gray-50 border border-gray-200 transition-colors"
+                >
+                  Keep it
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-3 rounded-full font-medium bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AppShell>
   );
 }

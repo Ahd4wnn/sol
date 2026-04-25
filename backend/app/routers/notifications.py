@@ -78,3 +78,12 @@ async def _send_batch(messages: list, tag: str) -> dict:
 
     logger.info(f"Sent {sent} {tag} notifications")
     return {"sent": sent, "tag": tag}
+
+
+@router.post("/daily-maintenance")
+async def daily_maintenance(request: Request):
+    """Run once daily — apply memory decay + send nudges."""
+    verify_cron(request)
+    from app.services.memory_extractor import apply_memory_decay
+    await apply_memory_decay()
+    return {"success": True, "ran": "memory_decay"}

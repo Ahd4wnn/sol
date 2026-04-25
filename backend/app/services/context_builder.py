@@ -1,11 +1,15 @@
 import logging
 from app.services.supabase_client import supabase
+from app.services.memory_service import (
+    get_user_memories,
+    format_memories_for_prompt
+)
 
 logger = logging.getLogger("sol")
 
 async def build_context(user_id: str, session_id: str) -> dict:
     """
-    Fetches ONLY profile and session metadata.
+    Fetches profile, session metadata, and structured memories.
     Message history is handled directly in the router
     to avoid race conditions and ordering issues.
     """
@@ -37,49 +41,21 @@ async def build_context(user_id: str, session_id: str) -> dict:
             .limit(1).execute()
         session_data = (session_res.data or [{}])[0]
 
-        # Relationship notes (factual, not conversational)
-        rel_res = supabase.table("memory_notes")\
-            .select("note, tags")\
-            .eq("user_id", user_id)\
-            .order("created_at", desc=True)\
-            .execute()
-
-        relationship_notes = []
-        long_term_memory = []
-        permanent_memory = []
-
-        for n in (rel_res.data or []):
-            tags = n.get("tags") or []
-            if not isinstance(tags, list):
-                tags = []
-            if "crisis_flag" in tags:
-                continue
-            note_text = n.get("note", "").strip()
-            if not note_text:
-                continue
-
-            if "permanent" in tags:
-                permanent_memory.append(note_text)
-            elif "relationship" in tags:
-                relationship_notes.append(note_text)
-            elif "long_term" in tags or "journal" in tags:
-                long_term_memory.append(note_text)
+        # Structured memories
+        memories = await get_user_memories(user_id)
+        formatted_memories = format_memories_for_prompt(memories)
 
         logger.info(
             f"Context: profile={bool(personality_profile)}, "
-            f"relationships={len(relationship_notes)}, "
-            f"long_term={len(long_term_memory)}, "
-            f"permanent={len(permanent_memory)}"
+            f"memories={formatted_memories[:80] if formatted_memories else 'none'}"
         )
 
         return {
             "personality_profile": personality_profile,
             "user_profile": user_profile,
-            "current_messages": [],  # intentionally empty
-                                     # handled in router
-            "relationship_notes": relationship_notes,
-            "long_term_memory": long_term_memory,
-            "permanent_memory": permanent_memory,
+            "current_messages": [],  # handled in router
+            "formatted_memories": formatted_memories,
+            "raw_memories": memories,
             "session_metadata": {
                 "mood_before": session_data.get("mood_before", ""),
                 "mood_word": session_data.get("mood_word", ""),
@@ -99,8 +75,7 @@ async def build_context(user_id: str, session_id: str) -> dict:
             "personality_profile": {},
             "user_profile": {},
             "current_messages": [],
-            "relationship_notes": [],
-            "long_term_memory": [],
-            "permanent_memory": [],
+            "formatted_memories": "",
+            "raw_memories": {},
             "session_metadata": {},
         }

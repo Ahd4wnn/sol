@@ -32,6 +32,8 @@ export default function Session() {
   const [endMood, setEndMood] = useState(null);
   const [isEnding, setIsEnding] = useState(false);
   const [billingStatus, setBillingStatus] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const bottomRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -84,20 +86,17 @@ export default function Session() {
   }, [isStreaming]);
 
   useEffect(() => {
-    // Guard: only run once, only when session is fully loaded,
-    // only when there are zero messages, only when opening_context exists
     if (
       hasAutoStarted.current ||
       loading ||
       !session ||
       error ||
-      dbMessages.length > 0 ||  // if messages exist, don't auto-send
+      dbMessages.length > 0 ||
       !session.opening_context
     ) return;
 
     hasAutoStarted.current = true;
 
-    // Small delay to ensure component is fully mounted
     const timer = setTimeout(() => {
       sendMessage(session.opening_context);
     }, 300);
@@ -141,6 +140,17 @@ export default function Session() {
     } catch (err) {
       addToast('Failed to save session.', 'error');
       setIsEnding(false);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    setDeleteLoading(true);
+    try {
+      await api.delete(`/api/sessions/${id}`);
+      navigate('/sessions');
+    } catch (err) {
+      addToast('Could not delete session.', 'error');
+      setDeleteLoading(false);
     }
   };
 
@@ -302,7 +312,7 @@ export default function Session() {
           </div>
         </footer>
 
-        {/* End Session Modal */}
+        {/* End Session / Delete Modal */}
         <AnimatePresence>
           {showEndModal && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
@@ -311,7 +321,12 @@ export default function Session() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-sol-text-primary/30 backdrop-blur-sm"
-                onClick={() => setShowEndModal(false)}
+                onClick={() => {
+                  if (!isEnding && !deleteLoading) {
+                    setShowEndModal(false);
+                    setShowDeleteConfirm(false);
+                  }
+                }}
               />
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -319,31 +334,72 @@ export default function Session() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="relative w-full max-w-md bg-white rounded-3xl shadow-xl p-8"
               >
-                <h3 className="text-2xl font-display italic text-center mb-2">
-                  How are you leaving?
-                </h3>
-                <p className="text-center text-sol-text-secondary mb-8 text-sm">
-                  Takes a quick second to reflect on the session.
-                </p>
+                {!showDeleteConfirm ? (
+                  <>
+                    <h3 className="text-2xl font-display italic text-center mb-2">
+                      How are you leaving?
+                    </h3>
+                    <p className="text-center text-sol-text-secondary mb-8 text-sm">
+                      Takes a quick second to reflect on the session.
+                    </p>
 
-                <MoodPicker value={endMood} onChange={setEndMood} size="lg" />
+                    <MoodPicker value={endMood} onChange={setEndMood} size="lg" />
 
-                <div className="flex gap-3 mt-8">
-                  <button
-                    onClick={() => setShowEndModal(false)}
-                    className="flex-1 px-4 py-3 rounded-full font-medium text-sol-text-secondary hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleEndSubmit}
-                    disabled={!endMood || isEnding}
-                    className={`flex-1 px-4 py-3 rounded-full font-medium bg-sol-primary text-white transition-colors
-                      ${!endMood || isEnding ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#b05c24]'}`}
-                  >
-                    {isEnding ? 'Ending...' : 'End Session'}
-                  </button>
-                </div>
+                    <div className="flex gap-3 mt-8">
+                      <button
+                        onClick={() => setShowEndModal(false)}
+                        className="flex-1 px-4 py-3 rounded-full font-medium text-sol-text-secondary hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleEndSubmit}
+                        disabled={!endMood || isEnding}
+                        className={`flex-1 px-4 py-3 rounded-full font-medium bg-sol-primary text-white transition-colors
+                          ${!endMood || isEnding ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#b05c24]'}`}
+                      >
+                        {isEnding ? 'Ending...' : 'End Session'}
+                      </button>
+                    </div>
+                    <div className="text-center mt-5">
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="text-sm text-gray-400 hover:text-red-500 transition-colors"
+                        style={{ fontFamily: 'DM Sans, sans-serif' }}
+                      >
+                        or delete this session
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                      <span className="text-red-500 text-xl">🗑</span>
+                    </div>
+                    <h3 className="text-xl font-display italic text-center text-sol-text-primary mb-2">
+                      Delete this session?
+                    </h3>
+                    <p className="text-center text-sol-text-secondary text-sm mb-6">
+                      This will permanently remove the session and all its messages. Your memories will be kept.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={deleteLoading}
+                        className="flex-1 px-4 py-3 rounded-full font-medium text-sol-text-secondary hover:bg-gray-50 border border-gray-200 transition-colors"
+                      >
+                        Go back
+                      </button>
+                      <button
+                        onClick={handleDeleteSession}
+                        disabled={deleteLoading}
+                        className="flex-1 px-4 py-3 rounded-full font-medium bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                      >
+                        {deleteLoading ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </motion.div>
             </div>
           )}

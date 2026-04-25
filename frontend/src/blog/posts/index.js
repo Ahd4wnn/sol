@@ -15,7 +15,30 @@ const posts = [
     tags: ["overthinking", "sleep", "anxiety"],
     readTime: 5,
   },
-  // Add new posts here
+  {
+    slug: "talk-to-yourself-safe-space-mental-health",
+    title: "Talk to Yourself: Why Your Brain Needs a Safe Space",
+    description: "Feeling mentally overwhelmed as a student? Learn why your brain needs a safe space to think and how expressing your thoughts can reduce stress and anxiety.",
+    date: "2026-04-24",
+    tags: ["mental health", "students", "anxiety", "self reflection", "journaling"],
+    readTime: 6,
+  },
+  {
+    slug: "overthinking-at-night-student-mental-health",
+    title: "Overthinking at Night? Here’s What Your Brain Is Doing",
+    description: "Struggling with overthinking at night? Learn why your brain becomes louder before sleep and how to calm your thoughts as a student.",
+    date: "2026-04-24",
+    tags: ["overthinking", "anxiety", "students", "mental health", "sleep"],
+    readTime: 6,
+  },
+  {
+    slug: "no-motivation-to-study-student-mental-health",
+    title: "No Motivation to Study? This Is What’s Actually Happening",
+    description: "Struggling with no motivation to study? Learn why students lose motivation and how to regain focus without forcing yourself.",
+    date: "2026-04-24",
+    tags: ["motivation", "students", "burnout", "mental health", "focus"],
+    readTime: 6,
+  },
 ]
 
 export default posts

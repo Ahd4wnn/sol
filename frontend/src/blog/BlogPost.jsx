@@ -21,7 +21,7 @@ export default function BlogPost() {
         // Strip frontmatter (everything between --- and ---)
         const raw = mod.default
         const withoutFrontmatter = raw.replace(
-          /^---[\s\S]*?---\n/, ''
+          /^\s*---[\s\S]*?---\s*/, ''
         ).trim()
         setPostContent(withoutFrontmatter)
         setLoading(false)

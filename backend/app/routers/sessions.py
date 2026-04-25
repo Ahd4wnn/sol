@@ -83,10 +83,49 @@ def update_session(session_id: str, payload: UpdateSessionRequest, background_ta
         raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
 
 @router.delete("/{session_id}")
-def delete_session(session_id: str, user=Depends(get_current_user)):
+async def delete_session(session_id: str, user=Depends(get_current_user)):
     try:
-        supabase.table("therapy_sessions").delete().eq("id", session_id).eq("user_id", user.id).execute()
-        return {"status": "success"}
+        # Verify ownership
+        res = supabase.table("therapy_sessions")\
+            .select("id")\
+            .eq("id", session_id)\
+            .eq("user_id", user.id)\
+            .limit(1).execute()
+
+        if not res.data:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": True,
+                        "message": "Session not found"}
+            )
+
+        # Nullify memory_notes FK reference (don't delete memories)
+        supabase.table("memory_notes")\
+            .update({"source_session_id": None})\
+            .eq("source_session_id", session_id).execute()
+
+        # Delete messages (foreign key)
+        supabase.table("messages")\
+            .delete()\
+            .eq("session_id", session_id).execute()
+
+        # Delete the session
+        supabase.table("therapy_sessions")\
+            .delete()\
+            .eq("id", session_id)\
+            .eq("user_id", user.id).execute()
+
+        logger.info(
+            f"Session {session_id} deleted by user {user.id}"
+        )
+        return {"success": True}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"delete_session failed for user {user.id}: {e}")
-        raise HTTPException(status_code=500, detail={"error": True, "message": "Something went wrong. Please try again.", "code": "SERVER_ERROR"})
+        logger.error(f"delete_session failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": True,
+                    "message": "Could not delete session"}
+        )
