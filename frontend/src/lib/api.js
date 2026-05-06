@@ -73,9 +73,17 @@ api.interceptors.response.use(
 
     if (status === 401) {
       tokenCache = { value: null, expiresAt: 0 }
-      if (!window.location.pathname.includes('/auth')) {
-        window.location.href = '/auth'
-      }
+      // If we get a 401, the token is truly invalid on the backend.
+      // We must sign out of Supabase to clear the bad local session.
+      // We manually remove the local storage token first because signOut() 
+      // can fail if the token is already expired on the server.
+      localStorage.removeItem('sb-gjggujmxcmduleftuboi-auth-token')
+      
+      supabase.auth.signOut().catch(() => {}).finally(() => {
+        if (!window.location.pathname.includes('/auth')) {
+          window.location.href = '/auth'
+        }
+      })
     }
 
     return Promise.reject(error)
