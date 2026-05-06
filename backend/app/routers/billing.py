@@ -2,7 +2,9 @@ import razorpay
 import hmac
 import hashlib
 import json
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
+from app.limiter import limiter
 from app.middleware.auth import get_current_user
 from app.services.supabase_client import supabase
 from app.services.subscription_service import get_subscription
@@ -56,7 +58,8 @@ async def get_billing_status(user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail={"error": True, "message": "Could not fetch billing status"})
 
 @router.post("/create-order")
-async def create_order(payload: dict, user=Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def create_order(request: Request, payload: dict, user=Depends(get_current_user)):
     """Creates a Razorpay order for one-time or subscription checkout."""
     try:
         plan_id = payload.get("plan")
@@ -131,6 +134,49 @@ async def verify_payment(payload: dict, user=Depends(get_current_user)):
         }, on_conflict="user_id").execute()
 
         logger.info(f"Subscription activated: user={user.id} plan={plan_id}")
+
+        # Discord notification (non-blocking)
+        try:
+            from app.services.discord import notify_new_subscription
+            profile_res = supabase.table("profiles")\
+                .select("preferred_name, full_name")\
+                .eq("id", user.id).limit(1).execute()
+            p = (profile_res.data or [{}])[0]
+            user_name = p.get("preferred_name") or p.get("full_name") or "Someone"
+
+            pro_count_res = supabase.table("subscriptions")\
+                .select("id", count="exact")\
+                .in_("status", ["active", "gifted"]).execute()
+            total_pro = pro_count_res.count or 0
+
+            creator_name = None
+            via_referral = False
+            try:
+                ref_check = supabase.table("referrals")\
+                    .select("creators(name)")\
+                    .eq("user_id", user.id)\
+                    .eq("converted", True)\
+                    .limit(1).execute()
+                if ref_check.data:
+                    via_referral = True
+                    creator_name = ref_check.data[0].get("creators", {}).get("name")
+            except Exception:
+                pass
+
+            plan_info = PLANS.get(plan_id, {})
+            asyncio.create_task(
+                notify_new_subscription(
+                    user_name=user_name,
+                    plan=plan_id,
+                    amount_usd=plan_info.get("amount", 0) / 100,
+                    total_pro_users=total_pro,
+                    via_referral=via_referral,
+                    creator_name=creator_name,
+                )
+            )
+        except Exception as discord_err:
+            logger.error(f"Discord notify failed: {discord_err}")
+
         return {"success": True, "plan": plan_id}
 
     except HTTPException:

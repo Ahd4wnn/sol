@@ -48,6 +48,11 @@ api.interceptors.response.use(
     const status = error.response?.status
     const url = error.config?.url
 
+    if (status === 429) {
+      console.warn('[API] Rate limit hit')
+      return Promise.reject(error)
+    }
+
     if (!error.response) {
       console.warn('[API] Network error — backend may be unreachable')
     }

@@ -41,6 +41,23 @@ async def save_intake(payload: dict, user=Depends(get_current_user)):
             .eq("id", user.id).execute()
 
         logger.info(f"Intake saved for user {user.id}")
+
+        # Discord signup notification (non-blocking)
+        try:
+            import asyncio
+            from app.services.discord import notify_new_signup
+            name_res = supabase.table("profiles")\
+                .select("preferred_name, full_name")\
+                .eq("id", user.id).limit(1).execute()
+            p = (name_res.data or [{}])[0]
+            user_name = p.get("preferred_name") or p.get("full_name") or "New user"
+            total_res = supabase.table("profiles")\
+                .select("id", count="exact").execute()
+            total_users = total_res.count or 0
+            asyncio.create_task(notify_new_signup(user_name, total_users))
+        except Exception:
+            pass  # never crash for a Discord ping
+
         return {"success": True}
 
     except Exception as e:

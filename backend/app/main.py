@@ -2,7 +2,11 @@ import logging
 import time
 from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
+from app.limiter import limiter
 from app.routers import auth, sessions, profile, agent, memory, messages, admin, billing, push, notifications, creators
 from app.services.supabase_client import supabase
 
@@ -13,6 +17,11 @@ logging.basicConfig(
 logger = logging.getLogger("sol")
 
 app = FastAPI(title="Sol API", version="1.0.0")
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
   CORSMiddleware,

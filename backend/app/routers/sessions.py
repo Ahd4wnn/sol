@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from app.limiter import limiter
 from app.middleware.auth import get_current_user
 from app.services.supabase_client import supabase
 from app.models.schemas import CreateSessionRequest, UpdateSessionRequest
@@ -9,7 +10,8 @@ logger = logging.getLogger("sol")
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.post("/create")
-async def create_session(payload: CreateSessionRequest, user=Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def create_session(request: Request, payload: CreateSessionRequest, user=Depends(get_current_user)):
     try:
         supabase.table("profiles").upsert({"id": user.id}).execute()
 

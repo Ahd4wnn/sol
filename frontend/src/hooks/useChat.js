@@ -62,6 +62,10 @@ export function useChat(sessionId, setMessages) {
         const errData = await res.json().catch(() => ({}));
         const code = errData?.detail?.code || errData?.code;
 
+        if (res.status === 429) {
+          throw new Error("You're sending messages too fast. Wait a moment.");
+        }
+
         if (res.status === 402 || code === 'TRIAL_EXCEEDED') {
           // Redirect to upgrade page
           window.location.href = '/paywall';

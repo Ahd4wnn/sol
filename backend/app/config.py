@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     vapid_public_key: str = ""
     vapid_claims_email: str = ""
     cron_secret: str = ""
+    discord_webhook_url: str = ""
 
     class Config:
         env_file = ".env"

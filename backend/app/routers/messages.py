@@ -1,6 +1,7 @@
 import json
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from app.limiter import limiter
 from fastapi.responses import StreamingResponse
 from app.middleware.auth import get_current_user
 from app.services.supabase_client import supabase
@@ -190,6 +191,13 @@ async def send_message(
             except Exception as ce:
                 logger.error(f"Crisis logging failed: {ce}")
 
+            # Discord crisis notification
+            try:
+                from app.services.discord import notify_crisis_flag
+                asyncio.create_task(notify_crisis_flag(user.id, "severe"))
+            except Exception:
+                pass
+
             res = supabase.table("messages").insert({
                 "session_id": payload.session_id,
                 "role": "assistant",
@@ -281,7 +289,9 @@ Stay in the conversation — do NOT abandon them after giving resources.
 
 
 @router.post("/send-stream")
+@limiter.limit("10/minute")
 async def send_message_stream(
+    request: Request,
     payload: SendMessageRequest,
     background_tasks: BackgroundTasks,
     user=Depends(get_current_user)
@@ -376,6 +386,13 @@ async def send_message_stream(
             except Exception as e:
                 logger.error(f"Crisis logging failed: {e}")
 
+            # Discord crisis notification
+            try:
+                from app.services.discord import notify_crisis_flag
+                asyncio.create_task(notify_crisis_flag(user.id, "severe"))
+            except Exception:
+                pass
+
             # Save the hardcoded crisis response to DB immediately
             supabase.table("messages").insert({
                 "session_id": payload.session_id,
@@ -419,6 +436,13 @@ async def send_message_stream(
                 }).execute()
             except Exception as e:
                 logger.error(f"Crisis logging failed: {e}")
+
+            # Discord crisis notification
+            try:
+                from app.services.discord import notify_crisis_flag
+                asyncio.create_task(notify_crisis_flag(user.id, "moderate"))
+            except Exception:
+                pass
                 
             crisis_injection = """
 ⚠️ URGENT — CRISIS DETECTED ⚠️

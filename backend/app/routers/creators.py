@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from app.limiter import limiter
 from app.services.supabase_client import supabase
 from app.config import settings
 from datetime import datetime
@@ -13,7 +14,8 @@ COMMISSION_RATE = 0.30  # 30%
 # ── PUBLIC ENDPOINTS (no auth needed) ──
 
 @router.get("/validate-code/{code}")
-async def validate_promo_code(code: str):
+@limiter.limit("20/minute")
+async def validate_promo_code(request: Request, code: str):
     """Called on auth page when user enters promo code."""
     try:
         res = supabase.table("creators")\
@@ -97,7 +99,8 @@ async def get_current_creator(request: Request):
 
 
 @router.post("/login")
-async def creator_login(payload: dict):
+@limiter.limit("5/minute")
+async def creator_login(request: Request, payload: dict):
     try:
         email = payload.get("email", "").lower().strip()
         password = payload.get("password", "")
