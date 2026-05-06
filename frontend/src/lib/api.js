@@ -1,8 +1,22 @@
 import axios from 'axios'
 import { supabase } from './supabase'
 
+const rawBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+let finalBaseUrl = rawBaseUrl
+
+// Prevent duplicate /api/api/... paths
+// If user sets VITE_API_URL to 'api' or '/api', we set baseURL to empty string 
+// because all our endpoints already start with '/api/'
+if (finalBaseUrl === 'api' || finalBaseUrl === '/api' || finalBaseUrl === '/api/' || finalBaseUrl === 'api/') {
+  finalBaseUrl = ''
+} else if (finalBaseUrl.endsWith('/api')) {
+  finalBaseUrl = finalBaseUrl.slice(0, -4)
+} else if (finalBaseUrl.endsWith('/api/')) {
+  finalBaseUrl = finalBaseUrl.slice(0, -5)
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: finalBaseUrl,
   timeout: 15000,
 })
 
