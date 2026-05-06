@@ -1,40 +1,50 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/axios'
-
-const PLANS = [
-  {
-    id: 'pro_monthly',
-    name: 'Monthly',
-    price: '$9',
-    period: '/month',
-    savings: null,
-    features: [
-      'Unlimited sessions',
-      'Full memory & context',
-      'All therapist characters',
-      'Priority support',
-    ]
-  },
-  {
-    id: 'pro_yearly',
-    name: 'Yearly',
-    price: '$89',
-    period: '/year',
-    savings: 'Save 17%',
-    popular: true,
-    features: [
-      'Everything in Monthly',
-      'Best value — $7.40/month',
-      'Early access to new features',
-    ]
-  }
-]
 
 export default function Upgrade() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(null)
   const [error, setError] = useState(null)
+  const [pricing, setPricing] = useState(null)
+
+  useEffect(() => {
+    api.get('/api/billing/status')
+      .then(r => setPricing(r.data))
+      .catch(() => {})
+  }, [])
+
+  const sym = pricing?.currency_symbol || '$'
+  const plans = pricing?.plans || {}
+
+  const PLAN_CARDS = [
+    {
+      id: 'pro_monthly',
+      name: 'Monthly',
+      price: `${sym}${plans.pro_monthly?.amount_display || '10'}`,
+      period: '/month',
+      savings: plans.pro_monthly?.savings || null,
+      features: [
+        'Unlimited sessions',
+        'Full memory & context',
+        'All therapist characters',
+        'Priority support',
+      ]
+    },
+    {
+      id: 'pro_yearly',
+      name: 'Yearly',
+      price: `${sym}${plans.pro_yearly?.amount_display || '89'}`,
+      period: '/year',
+      savings: plans.pro_yearly?.savings || null,
+      popular: true,
+      features: [
+        'Everything in Monthly',
+        'Best value',
+        'Early access to new features',
+      ]
+    }
+  ]
 
   const handleUpgrade = async (planId) => {
     setLoading(planId)
@@ -49,7 +59,6 @@ export default function Upgrade() {
         name: 'Sol',
         description: data.description,
         order_id: data.order_id,
-        prefill: { email: data.user_email },
         theme: { color: '#C96B2E' },
         handler: async (response) => {
           try {
@@ -126,7 +135,7 @@ export default function Upgrade() {
         width: '100%',
         maxWidth: 600,
       }}>
-        {PLANS.map(plan => (
+        {PLAN_CARDS.map(plan => (
           <div key={plan.id} style={{
             flex: '1 1 240px',
             maxWidth: 280,

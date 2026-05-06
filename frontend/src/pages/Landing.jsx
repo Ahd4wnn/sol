@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BrainCircuit, Target, Moon } from 'lucide-react'
+import { api } from '../lib/axios'
 
 const CHAT_MESSAGES = [
   { role: 'user', text: "I've been feeling really overwhelmed with exams." },
@@ -40,6 +41,24 @@ export default function Landing() {
   const [streamedText, setStreamedText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [isTypingIndicator, setIsTypingIndicator] = useState(false)
+  const [landingPricing, setLandingPricing] = useState({
+    symbol: '$', monthly: '10', yearly: '89', savings: 'Save $31',
+  })
+
+  // Fetch location-based pricing
+  useEffect(() => {
+    api.get('/api/billing/pricing')
+      .then(r => {
+        const p = r.data
+        setLandingPricing({
+          symbol: p.currency_symbol,
+          monthly: p.plans.pro_monthly.amount_display,
+          yearly: p.plans.pro_yearly.amount_display,
+          savings: p.plans.pro_yearly.savings || 'Best value',
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   // Animate chat messages one by one
   useEffect(() => {
@@ -601,7 +620,7 @@ export default function Landing() {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4,
                          marginBottom: 24 }}>
               <span style={{ fontFamily: 'Fraunces, serif', fontSize: 44,
-                            fontWeight: 300, color: '#1A1714' }}>$0</span>
+                            fontWeight: 300, color: '#1A1714' }}>{landingPricing.symbol}0</span>
             </div>
             {[
               '10 messages to try Sol',
@@ -676,12 +695,15 @@ export default function Landing() {
             <div style={{ marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                 <span style={{ fontFamily: 'Fraunces, serif', fontSize: 44,
-                              fontWeight: 300, color: '#1A1714' }}>$9</span>
+                              fontWeight: 300, color: '#1A1714' }}>
+                  <span style={{ fontSize: 22 }}>{landingPricing.symbol}</span>
+                  {landingPricing.monthly}
+                </span>
                 <span style={{ color: '#9E8E7E', fontSize: 15 }}>/month</span>
               </div>
               <div style={{ fontSize: 13, color: '#3D7A5F', fontWeight: 500,
                            marginBottom: 20 }}>
-                or $89/year · save 17%
+                or {landingPricing.symbol}{landingPricing.yearly}/year · {landingPricing.savings}
               </div>
             </div>
 

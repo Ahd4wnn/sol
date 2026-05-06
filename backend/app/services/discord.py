@@ -61,36 +61,42 @@ async def send_discord_notification(
 async def notify_new_subscription(
     user_name: str,
     plan: str,
-    amount_usd: float,
-    total_pro_users: int,
+    amount: int,
+    currency: str = "USD",
+    country: str = "US",
+    total_pro_users: int = 0,
     via_referral: bool = False,
     creator_name: str = None,
 ):
+    symbol = "₹" if currency == "INR" else "$"
+    amount_display = f"{symbol}{amount / 100:.0f}"
+
     plan_label = "Pro Yearly 🗓️" if "year" in plan.lower() \
                  else "Pro Monthly 📅"
     ref_note = f" via {creator_name}" if via_referral \
                and creator_name else ""
+    flag = "🇮🇳" if country == "IN" else "🌍"
 
     await send_discord_notification(
-        title="💰 New Subscription!",
+        title=f"💰 New Subscription! {flag}",
         description=(
             f"**{user_name}** just upgraded to **{plan_label}**"
             f"{ref_note}"
         ),
-        color=0x3D7A5F,  # green for money
+        color=0x3D7A5F,
         fields=[
             {
                 "name": "Amount",
-                "value": f"${amount_usd:.2f}",
+                "value": amount_display,
                 "inline": True,
             },
             {
-                "name": "Plan",
-                "value": plan_label,
+                "name": "Country",
+                "value": country,
                 "inline": True,
             },
             {
-                "name": "Total Pro Users",
+                "name": "Total Pro",
                 "value": str(total_pro_users),
                 "inline": True,
             },

@@ -53,6 +53,8 @@ export default function UpgradePage() {
   }
 
   const isPro = billingStatus?.is_pro === true
+  const sym = billingStatus?.currency_symbol || '$'
+  const plans = billingStatus?.plans || {}
 
   return (
     <AppShell>
@@ -144,7 +146,10 @@ export default function UpgradePage() {
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4,
                              marginBottom: 20 }}>
                   <span style={{ fontFamily: 'Fraunces, serif', fontSize: 44,
-                                fontWeight: 300, color: '#1A1714' }}>$9</span>
+                                fontWeight: 300, color: '#1A1714' }}>
+                    <span style={{ fontSize: 22 }}>{sym}</span>
+                    {plans.pro_monthly?.amount_display || '10'}
+                  </span>
                   <span style={{ color: '#9E8E7E', fontSize: 15 }}>/month</span>
                 </div>
                 {[
@@ -201,12 +206,15 @@ export default function UpgradePage() {
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4,
                              marginBottom: 4 }}>
                   <span style={{ fontFamily: 'Fraunces, serif', fontSize: 44,
-                                fontWeight: 300, color: '#1A1714' }}>$89</span>
+                                fontWeight: 300, color: '#1A1714' }}>
+                    <span style={{ fontSize: 22 }}>{sym}</span>
+                    {plans.pro_yearly?.amount_display || '89'}
+                  </span>
                   <span style={{ color: '#9E8E7E', fontSize: 15 }}>/year</span>
                 </div>
                 <div style={{ fontSize: 13, color: '#3D7A5F', fontWeight: 500,
                              marginBottom: 20 }}>
-                  $7.40/month · Save 17%
+                  {plans.pro_yearly?.savings || 'Best value'}
                 </div>
                 {[
                   'Everything in Monthly',

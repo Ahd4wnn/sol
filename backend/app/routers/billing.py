@@ -15,35 +15,119 @@ from datetime import datetime, timedelta
 logger = logging.getLogger("sol")
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-PLANS = {
-    "pro_monthly": {
-        "amount": 900,          # $9.00 in cents
-        "currency": "USD",
-        "period": "monthly",
-        "interval": 1,
-        "description": "Sol Pro — Monthly"
-    },
-    "pro_yearly": {
-        "amount": 8900,         # $89.00 in cents
-        "currency": "USD",
-        "period": "yearly",
-        "interval": 1,
-        "description": "Sol Pro — Yearly"
-    }
-}
+
+# ── Location-based pricing ──
+
+def get_user_country(request: Request) -> str:
+    """
+    Detect user country from Vercel/Cloudflare headers.
+    Falls back to "US" if not detectable.
+    """
+    # Vercel sets this automatically on all requests
+    country = request.headers.get("x-vercel-ip-country", "")
+
+    # Cloudflare (if using Cloudflare proxy)
+    if not country:
+        country = request.headers.get("cf-ipcountry", "")
+
+    # Railway/Render sometimes forward this
+    if not country:
+        country = request.headers.get("x-country-code", "")
+
+    return country.upper().strip() or "US"
+
+
+def get_pricing(country: str) -> dict:
+    """
+    Returns pricing config based on country.
+    India gets INR pricing, everyone else gets USD.
+    """
+    if country == "IN":
+        return {
+            "currency": "INR",
+            "currency_symbol": "₹",
+            "locale": "en-IN",
+            "plans": {
+                "pro_monthly": {
+                    "id": "pro_monthly",
+                    "label": "Pro Monthly",
+                    "amount": 39900,        # paise (₹399)
+                    "amount_display": "399",
+                    "period": "month",
+                    "razorpay_currency": "INR",
+                    "savings": None,
+                },
+                "pro_yearly": {
+                    "id": "pro_yearly",
+                    "label": "Pro Yearly",
+                    "amount": 399900,       # paise (₹3,999)
+                    "amount_display": "3,999",
+                    "period": "year",
+                    "razorpay_currency": "INR",
+                    "savings": "Save ₹789",
+                },
+            }
+        }
+    else:
+        return {
+            "currency": "USD",
+            "currency_symbol": "$",
+            "locale": "en-US",
+            "plans": {
+                "pro_monthly": {
+                    "id": "pro_monthly",
+                    "label": "Pro Monthly",
+                    "amount": 1000,         # cents ($10)
+                    "amount_display": "10",
+                    "period": "month",
+                    "razorpay_currency": "USD",
+                    "savings": None,
+                },
+                "pro_yearly": {
+                    "id": "pro_yearly",
+                    "label": "Pro Yearly",
+                    "amount": 8900,         # cents ($89)
+                    "amount_display": "89",
+                    "period": "year",
+                    "razorpay_currency": "USD",
+                    "savings": "Save $31",
+                },
+            }
+        }
+
 
 def get_razorpay_client():
     return razorpay.Client(
         auth=(settings.razorpay_key_id, settings.razorpay_key_secret)
     )
 
+
+# ── Endpoints ──
+
+@router.get("/pricing")
+async def get_pricing_public(request: Request):
+    """Public endpoint — no auth required. Used by landing page."""
+    country = get_user_country(request)
+    pricing = get_pricing(country)
+    return {
+        "country": country,
+        "currency": pricing["currency"],
+        "currency_symbol": pricing["currency_symbol"],
+        "plans": pricing["plans"],
+    }
+
+
 @router.get("/status")
-async def get_billing_status(user=Depends(get_current_user)):
-    """Returns current subscription + message count for the frontend."""
+async def get_billing_status(request: Request, user=Depends(get_current_user)):
+    """Returns current subscription + message count + pricing for the frontend."""
     try:
         from app.services.subscription_service import get_message_count
         sub = await get_subscription(user.id)
         count = await get_message_count(user.id)
+
+        country = get_user_country(request)
+        pricing = get_pricing(country)
+
         return {
             "plan": sub.get("plan", "free"),
             "status": sub.get("status", "active"),
@@ -52,53 +136,72 @@ async def get_billing_status(user=Depends(get_current_user)):
             "is_pro": sub.get("plan") in ("pro_monthly", "pro_yearly")
                       and sub.get("status") in ("active", "gifted"),
             "period_end": sub.get("current_period_end"),
+            "country": country,
+            "currency": pricing["currency"],
+            "currency_symbol": pricing["currency_symbol"],
+            "plans": pricing["plans"],
         }
     except Exception as e:
         logger.error(f"get_billing_status failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"error": True, "message": "Could not fetch billing status"})
 
+
 @router.post("/create-order")
 @limiter.limit("10/minute")
 async def create_order(request: Request, payload: dict, user=Depends(get_current_user)):
-    """Creates a Razorpay order for one-time or subscription checkout."""
+    """Creates a Razorpay order — price determined server-side by geo."""
     try:
         plan_id = payload.get("plan")
-        if plan_id not in PLANS:
+        if plan_id not in ("pro_monthly", "pro_yearly"):
             raise HTTPException(status_code=400, detail={"error": True, "message": "Invalid plan"})
 
-        plan = PLANS[plan_id]
+        # Detect country SERVER-SIDE — never trust client
+        country = get_user_country(request)
+        pricing = get_pricing(country)
+        plan = pricing["plans"][plan_id]
+
+        final_amount = plan["amount"]
         client = get_razorpay_client()
 
         order = client.order.create({
-            "amount": plan["amount"],
-            "currency": plan["currency"],
+            "amount": final_amount,
+            "currency": plan["razorpay_currency"],
+            "receipt": f"sol_{str(user.id)[:8]}_{plan_id}",
             "notes": {
                 "user_id": str(user.id),
                 "plan": str(plan_id),
+                "country": country,
                 "email": str(user.email) if user.email else ""
             }
         })
 
-        user_email = getattr(user, "email", None) or ""
+        logger.info(
+            f"Order created: {plan_id} "
+            f"{plan['razorpay_currency']} "
+            f"{final_amount/100} "
+            f"for user {user.id} "
+            f"(country: {country})"
+        )
+
         return {
             "order_id": order["id"],
-            "amount": plan["amount"],
-            "currency": plan["currency"],
+            "amount": final_amount,
+            "currency": plan["razorpay_currency"],
             "plan": plan_id,
-            "description": plan["description"],
+            "description": f"Sol {plan['label']}",
+            "amount_display": f"{pricing['currency_symbol']}{plan['amount_display']}",
             "key_id": settings.razorpay_key_id,
-            "user_email": user_email,
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"create_order failed: {type(e).__name__}: {e}", exc_info=True)
-        error_msg = str(e)
-        raise HTTPException(status_code=500, detail={"error": True, "message": f"Could not create order: {error_msg}"})
+        raise HTTPException(status_code=500, detail={"error": True, "message": f"Could not create order"})
+
 
 @router.post("/verify-payment")
-async def verify_payment(payload: dict, user=Depends(get_current_user)):
+async def verify_payment(request: Request, payload: dict, user=Depends(get_current_user)):
     """Verifies Razorpay payment signature and activates subscription."""
     try:
         order_id = payload.get("razorpay_order_id")
@@ -136,6 +239,10 @@ async def verify_payment(payload: dict, user=Depends(get_current_user)):
         logger.info(f"Subscription activated: user={user.id} plan={plan_id}")
 
         # Discord notification (non-blocking)
+        country = get_user_country(request)
+        pricing = get_pricing(country)
+        plan_info = pricing["plans"].get(plan_id, {})
+
         try:
             from app.services.discord import notify_new_subscription
             profile_res = supabase.table("profiles")\
@@ -163,12 +270,13 @@ async def verify_payment(payload: dict, user=Depends(get_current_user)):
             except Exception:
                 pass
 
-            plan_info = PLANS.get(plan_id, {})
             asyncio.create_task(
                 notify_new_subscription(
                     user_name=user_name,
                     plan=plan_id,
-                    amount_usd=plan_info.get("amount", 0) / 100,
+                    amount=plan_info.get("amount", 0),
+                    currency=plan_info.get("razorpay_currency", "USD"),
+                    country=country,
                     total_pro_users=total_pro,
                     via_referral=via_referral,
                     creator_name=creator_name,
@@ -184,6 +292,7 @@ async def verify_payment(payload: dict, user=Depends(get_current_user)):
     except Exception as e:
         logger.error(f"verify_payment failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"error": True, "message": "Payment verification failed"})
+
 
 @router.post("/cancel")
 async def cancel_subscription(user=Depends(get_current_user)):

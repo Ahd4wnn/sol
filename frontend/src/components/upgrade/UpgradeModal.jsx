@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { api } from '../../lib/axios'
 
 const STORAGE_KEY = 'sol_upgrade_modal_last_shown'
 const INTERVAL_MS = 5 * 60 * 60 * 1000  // 5 hours in milliseconds
 
 export function UpgradeModal({ isOpen, onClose }) {
   const navigate = useNavigate()
+  const [pricing, setPricing] = useState({ sym: '$', monthly: '10', yearly: '89', savings: 'Save $31' })
 
+  useEffect(() => {
+    if (!isOpen) return
+    api.get('/api/billing/pricing')
+      .then(r => {
+        const p = r.data
+        setPricing({
+          sym: p.currency_symbol,
+          monthly: p.plans.pro_monthly.amount_display,
+          yearly: p.plans.pro_yearly.amount_display,
+          savings: p.plans.pro_yearly.savings || 'Best value',
+        })
+      })
+      .catch(() => {})
+  }, [isOpen])
   return (
     <AnimatePresence>
       {isOpen && (
@@ -144,8 +160,8 @@ export function UpgradeModal({ isOpen, onClose }) {
               justifyContent: 'center',
             }}>
               {[
-                { label: 'Monthly', price: '$9/mo' },
-                { label: 'Yearly', price: '$89/yr', tag: 'Save 17%' },
+                { label: 'Monthly', price: `${pricing.sym}${pricing.monthly}/mo` },
+                { label: 'Yearly', price: `${pricing.sym}${pricing.yearly}/yr`, tag: pricing.savings },
               ].map(plan => (
                 <div key={plan.label} style={{
                   flex: 1,
