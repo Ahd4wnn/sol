@@ -14,7 +14,7 @@ export default function Admin() {
   const [codes, setCodes] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [giftUserId, setGiftUserId] = useState('')
-  const [giftPlan, setGiftPlan] = useState('pro_monthly')
+  const [giftPlan, setGiftPlan] = useState('pro_1month')
   const [giftNote, setGiftNote] = useState('')
   const [loading, setLoading] = useState(true)
   const [appSettings, setAppSettings] = useState({})
@@ -600,8 +600,10 @@ export default function Admin() {
                       outline: 'none', background: 'white',
                     }}
                   >
-                    <option value="pro_monthly">Pro Monthly (30 days)</option>
-                    <option value="pro_yearly">Pro Yearly (365 days)</option>
+                    <option value="pro_1month">Pro 1 Month (30 days)</option>
+                    <option value="pro_3month">Pro 3 Months (90 days)</option>
+                    <option value="pro_6month">Pro 6 Months (180 days)</option>
+                    <option value="pro_12month">Pro 12 Months (365 days)</option>
                   </select>
                 </div>
                 <div>

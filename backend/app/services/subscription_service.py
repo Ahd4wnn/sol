@@ -25,9 +25,9 @@ async def get_subscription(user_id: str) -> dict:
 
 async def is_pro(user_id: str) -> bool:
     sub = await get_subscription(user_id)
-    if sub.get("plan") in ("pro_monthly", "pro_yearly"):
-        if sub.get("status") in ("active", "gifted"):
-            return True
+    plan = sub.get("plan", "free")
+    if plan.startswith("pro_") and sub.get("status") in ("active", "gifted"):
+        return True
     return False
 
 

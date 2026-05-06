@@ -30,9 +30,9 @@ async def get_stats(admin=Depends(require_admin)):
         # Pro subscribers
         pro_res = supabase.table("subscriptions")\
             .select("plan, status", count="exact")\
-            .in_("plan", ["pro_monthly", "pro_yearly"])\
             .in_("status", ["active", "gifted"]).execute()
-        pro_users = pro_res.count or 0
+        # Filter to only pro plans
+        pro_users = sum(1 for s in (pro_res.data or []) if s.get("plan", "").startswith("pro_"))
 
         # Early members
         early_res = supabase.table("profiles")\
@@ -43,19 +43,19 @@ async def get_stats(admin=Depends(require_admin)):
         # Monthly vs yearly breakdown
         monthly_res = supabase.table("subscriptions")\
             .select("id", count="exact")\
-            .eq("plan", "pro_monthly")\
+            .eq("plan", "pro_1month")\
             .eq("status", "active").execute()
         yearly_res = supabase.table("subscriptions")\
             .select("id", count="exact")\
-            .eq("plan", "pro_yearly")\
+            .eq("plan", "pro_12month")\
             .eq("status", "active").execute()
 
         monthly_count = monthly_res.count or 0
         yearly_count = yearly_res.count or 0
 
-        # Revenue calculation
-        monthly_revenue = (monthly_count * 9) + (yearly_count * (89/12))
-        total_revenue_estimate = (monthly_count * 9) + (yearly_count * 89)
+        # Revenue calculation (approximate)
+        monthly_revenue = (monthly_count * 9.99) + (yearly_count * (86.99/12))
+        total_revenue_estimate = (monthly_count * 9.99) + (yearly_count * 86.99)
 
         # Total sessions
         sessions_res = supabase.table("therapy_sessions")\
@@ -96,11 +96,10 @@ async def get_stats(admin=Depends(require_admin)):
         recent_signups = []
         for p in (recent_res.data or []):
             pro_check = supabase.table("subscriptions")\
-                .select("id")\
+                .select("plan")\
                 .eq("user_id", p["id"])\
-                .eq("status", "active")\
-                .limit(1).execute()
-            p["is_pro"] = bool(pro_check.data)
+                .in_("status", ["active", "gifted"]).execute()
+            p["is_pro"] = any(s.get("plan", "").startswith("pro_") for s in (pro_check.data or []))
             recent_signups.append(p)
 
         return {
@@ -173,9 +172,11 @@ async def gift_pro(payload: dict, admin=Depends(require_admin)):
     """Give any user free Pro access."""
     try:
         user_id = payload.get("user_id")
-        plan = payload.get("plan", "pro_monthly")  # pro_monthly or pro_yearly
+        plan = payload.get("plan", "pro_1month")
         note = payload.get("note", "Gifted by admin")
-        months = 12 if plan == "pro_yearly" else 1
+
+        plan_months = {"pro_1month": 1, "pro_3month": 3, "pro_6month": 6, "pro_12month": 12}
+        months = plan_months.get(plan, 1)
 
         from datetime import timedelta
         now = datetime.utcnow()

@@ -11,9 +11,28 @@ from app.services.subscription_service import get_subscription
 from app.config import settings
 import logging
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger("sol")
 router = APIRouter(prefix="/billing", tags=["billing"])
+
+
+# ── Valid plan IDs ──
+VALID_PLANS = ["pro_1month", "pro_3month", "pro_6month", "pro_12month"]
+
+# ── Plan durations ──
+PLAN_DURATIONS = {
+    "pro_1month":  {"months": 1},
+    "pro_3month":  {"months": 3},
+    "pro_6month":  {"months": 6},
+    "pro_12month": {"months": 12},
+}
+
+
+def get_expiry_date(plan_id: str) -> str:
+    duration = PLAN_DURATIONS.get(plan_id, {"months": 1})
+    expiry = datetime.utcnow() + relativedelta(months=duration["months"])
+    return expiry.isoformat()
 
 
 # ── Location-based pricing ──
@@ -23,17 +42,11 @@ def get_user_country(request: Request) -> str:
     Detect user country from Vercel/Cloudflare headers.
     Falls back to "US" if not detectable.
     """
-    # Vercel sets this automatically on all requests
     country = request.headers.get("x-vercel-ip-country", "")
-
-    # Cloudflare (if using Cloudflare proxy)
     if not country:
         country = request.headers.get("cf-ipcountry", "")
-
-    # Railway/Render sometimes forward this
     if not country:
         country = request.headers.get("x-country-code", "")
-
     return country.upper().strip() or "US"
 
 
@@ -48,23 +61,57 @@ def get_pricing(country: str) -> dict:
             "currency_symbol": "₹",
             "locale": "en-IN",
             "plans": {
-                "pro_monthly": {
-                    "id": "pro_monthly",
-                    "label": "Pro Monthly",
-                    "amount": 39900,        # paise (₹399)
-                    "amount_display": "399",
+                "pro_1month": {
+                    "id": "pro_1month",
+                    "label": "1 Month",
+                    "original_amount": 124900,
+                    "amount": 83900,
+                    "original_display": "1,249",
+                    "amount_display": "839",
                     "period": "month",
+                    "period_count": 1,
                     "razorpay_currency": "INR",
                     "savings": None,
+                    "badge": None,
                 },
-                "pro_yearly": {
-                    "id": "pro_yearly",
-                    "label": "Pro Yearly",
-                    "amount": 399900,       # paise (₹3,999)
-                    "amount_display": "3,999",
-                    "period": "year",
+                "pro_3month": {
+                    "id": "pro_3month",
+                    "label": "3 Months",
+                    "original_amount": 249900,
+                    "amount": 166900,
+                    "original_display": "2,499",
+                    "amount_display": "1,669",
+                    "period": "3 months",
+                    "period_count": 3,
                     "razorpay_currency": "INR",
-                    "savings": "Save ₹789",
+                    "savings": "Save ₹830",
+                    "badge": None,
+                },
+                "pro_6month": {
+                    "id": "pro_6month",
+                    "label": "6 Months",
+                    "original_amount": 584900,
+                    "amount": 332900,
+                    "original_display": "5,849",
+                    "amount_display": "3,329",
+                    "period": "6 months",
+                    "period_count": 6,
+                    "razorpay_currency": "INR",
+                    "savings": "Save ₹2,520",
+                    "badge": "Most Popular",
+                },
+                "pro_12month": {
+                    "id": "pro_12month",
+                    "label": "12 Months",
+                    "original_amount": 1079900,
+                    "amount": 724900,
+                    "original_display": "10,799",
+                    "amount_display": "7,249",
+                    "period": "year",
+                    "period_count": 12,
+                    "razorpay_currency": "INR",
+                    "savings": "Save ₹3,550",
+                    "badge": "Best Value",
                 },
             }
         }
@@ -74,23 +121,57 @@ def get_pricing(country: str) -> dict:
             "currency_symbol": "$",
             "locale": "en-US",
             "plans": {
-                "pro_monthly": {
-                    "id": "pro_monthly",
-                    "label": "Pro Monthly",
-                    "amount": 1000,         # cents ($10)
-                    "amount_display": "10",
+                "pro_1month": {
+                    "id": "pro_1month",
+                    "label": "1 Month",
+                    "original_amount": 1499,
+                    "amount": 999,
+                    "original_display": "14.99",
+                    "amount_display": "9.99",
                     "period": "month",
+                    "period_count": 1,
                     "razorpay_currency": "USD",
                     "savings": None,
+                    "badge": None,
                 },
-                "pro_yearly": {
-                    "id": "pro_yearly",
-                    "label": "Pro Yearly",
-                    "amount": 8900,         # cents ($89)
-                    "amount_display": "89",
-                    "period": "year",
+                "pro_3month": {
+                    "id": "pro_3month",
+                    "label": "3 Months",
+                    "original_amount": 2999,
+                    "amount": 1999,
+                    "original_display": "29.99",
+                    "amount_display": "19.99",
+                    "period": "3 months",
+                    "period_count": 3,
                     "razorpay_currency": "USD",
-                    "savings": "Save $31",
+                    "savings": "Save $10",
+                    "badge": None,
+                },
+                "pro_6month": {
+                    "id": "pro_6month",
+                    "label": "6 Months",
+                    "original_amount": 6999,
+                    "amount": 3999,
+                    "original_display": "69.99",
+                    "amount_display": "39.99",
+                    "period": "6 months",
+                    "period_count": 6,
+                    "razorpay_currency": "USD",
+                    "savings": "Save $30",
+                    "badge": "Most Popular",
+                },
+                "pro_12month": {
+                    "id": "pro_12month",
+                    "label": "12 Months",
+                    "original_amount": 12999,
+                    "amount": 8699,
+                    "original_display": "129.99",
+                    "amount_display": "86.99",
+                    "period": "year",
+                    "period_count": 12,
+                    "razorpay_currency": "USD",
+                    "savings": "Save $43",
+                    "badge": "Best Value",
                 },
             }
         }
@@ -128,13 +209,16 @@ async def get_billing_status(request: Request, user=Depends(get_current_user)):
         country = get_user_country(request)
         pricing = get_pricing(country)
 
+        plan_val = sub.get("plan", "free")
+        is_pro = plan_val.startswith("pro_") and plan_val != "free" \
+                 and sub.get("status") in ("active", "gifted")
+
         return {
-            "plan": sub.get("plan", "free"),
+            "plan": plan_val,
             "status": sub.get("status", "active"),
             "messages_used": count,
             "messages_limit": 10,
-            "is_pro": sub.get("plan") in ("pro_monthly", "pro_yearly")
-                      and sub.get("status") in ("active", "gifted"),
+            "is_pro": is_pro,
             "period_end": sub.get("current_period_end"),
             "country": country,
             "currency": pricing["currency"],
@@ -152,10 +236,9 @@ async def create_order(request: Request, payload: dict, user=Depends(get_current
     """Creates a Razorpay order — price determined server-side by geo."""
     try:
         plan_id = payload.get("plan")
-        if plan_id not in ("pro_monthly", "pro_yearly"):
+        if plan_id not in VALID_PLANS:
             raise HTTPException(status_code=400, detail={"error": True, "message": "Invalid plan"})
 
-        # Detect country SERVER-SIDE — never trust client
         country = get_user_country(request)
         pricing = get_pricing(country)
         plan = pricing["plans"][plan_id]
@@ -197,7 +280,7 @@ async def create_order(request: Request, payload: dict, user=Depends(get_current
         raise
     except Exception as e:
         logger.error(f"create_order failed: {type(e).__name__}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail={"error": True, "message": f"Could not create order"})
+        raise HTTPException(status_code=500, detail={"error": True, "message": "Could not create order"})
 
 
 @router.post("/verify-payment")
@@ -222,9 +305,9 @@ async def verify_payment(request: Request, payload: dict, user=Depends(get_curre
                 detail={"error": True, "message": "Payment verification failed"}
             )
 
-        # Activate subscription
+        # Activate subscription with correct duration
         now = datetime.utcnow()
-        period_end = now + timedelta(days=365 if plan_id == "pro_yearly" else 30)
+        expiry_date = get_expiry_date(plan_id)
 
         supabase.table("subscriptions").upsert({
             "user_id": user.id,
@@ -232,11 +315,11 @@ async def verify_payment(request: Request, payload: dict, user=Depends(get_curre
             "status": "active",
             "razorpay_subscription_id": payment_id,
             "current_period_start": now.isoformat(),
-            "current_period_end": period_end.isoformat(),
+            "current_period_end": expiry_date,
             "updated_at": now.isoformat()
         }, on_conflict="user_id").execute()
 
-        logger.info(f"Subscription activated: user={user.id} plan={plan_id}")
+        logger.info(f"Subscription activated: user={user.id} plan={plan_id} expires={expiry_date}")
 
         # Discord notification (non-blocking)
         country = get_user_country(request)

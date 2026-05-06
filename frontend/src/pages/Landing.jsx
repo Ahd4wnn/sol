@@ -42,7 +42,10 @@ export default function Landing() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isTypingIndicator, setIsTypingIndicator] = useState(false)
   const [landingPricing, setLandingPricing] = useState({
-    symbol: '$', monthly: '10', yearly: '89', savings: 'Save $31',
+    symbol: '$',
+    monthly: '9.99', monthlyOriginal: '14.99',
+    yearly: '86.99', yearlyOriginal: '129.99',
+    savings: 'Save $43',
   })
 
   // Fetch location-based pricing
@@ -52,9 +55,11 @@ export default function Landing() {
         const p = r.data
         setLandingPricing({
           symbol: p.currency_symbol,
-          monthly: p.plans.pro_monthly.amount_display,
-          yearly: p.plans.pro_yearly.amount_display,
-          savings: p.plans.pro_yearly.savings || 'Best value',
+          monthly: p.plans.pro_1month.amount_display,
+          monthlyOriginal: p.plans.pro_1month.original_display,
+          yearly: p.plans.pro_12month.amount_display,
+          yearlyOriginal: p.plans.pro_12month.original_display,
+          savings: p.plans.pro_12month.savings || 'Best value',
         })
       })
       .catch(() => {})
@@ -662,75 +667,136 @@ export default function Landing() {
             >Get started free</button>
           </div>
 
-          {/* Pro */}
+          {/* Monthly — entry point */}
           <div style={{
-            flex: '1 1 260px',
-            maxWidth: 300,
-            padding: '32px 28px',
+            flex: '1 1 220px',
+            maxWidth: 260,
+            padding: '28px 28px',
             borderRadius: 24,
-            background: 'rgba(201,107,46,0.05)',
+            background: 'rgba(255,252,248,0.7)',
             backdropFilter: 'blur(16px)',
-            border: '2px solid #C96B2E',
-            position: 'relative',
+            border: '1px solid rgba(232,227,221,0.7)',
+            textAlign: 'center',
           }}>
             <div style={{
-              position: 'absolute',
-              top: -13,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#C96B2E',
-              color: 'white',
-              padding: '4px 18px',
-              borderRadius: 999,
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              whiteSpace: 'nowrap',
-            }}>MOST POPULAR</div>
-
-            <div style={{ fontSize: 13, color: '#C96B2E', fontWeight: 600,
-                         textTransform: 'uppercase', letterSpacing: '0.06em',
-                         marginBottom: 12 }}>Pro</div>
-
-            <div style={{ marginBottom: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontFamily: 'Fraunces, serif', fontSize: 44,
-                              fontWeight: 300, color: '#1A1714' }}>
-                  <span style={{ fontSize: 22 }}>{landingPricing.symbol}</span>
-                  {landingPricing.monthly}
-                </span>
-                <span style={{ color: '#9E8E7E', fontSize: 15 }}>/month</span>
-              </div>
-              <div style={{ fontSize: 13, color: '#3D7A5F', fontWeight: 500,
-                           marginBottom: 20 }}>
-                or {landingPricing.symbol}{landingPricing.yearly}/year · {landingPricing.savings}
-              </div>
+              fontSize: 12, fontWeight: 700,
+              color: '#9E8E7E', textTransform: 'uppercase',
+              letterSpacing: '0.06em', marginBottom: 8,
+            }}>Monthly</div>
+            <div style={{
+              fontSize: 13, color: '#C8C3BD',
+              textDecoration: 'line-through',
+            }}>{landingPricing.symbol}{landingPricing.monthlyOriginal}</div>
+            <div style={{
+              fontFamily: 'Fraunces, serif',
+              fontSize: 44, fontWeight: 300, color: '#1A1714',
+            }}>
+              <span style={{ fontSize: 20 }}>{landingPricing.symbol}</span>{landingPricing.monthly}
             </div>
-
+            <div style={{ fontSize: 13, color: '#9E8E7E' }}>per month</div>
             {[
               'Unlimited sessions',
-              'Full memory & relationships',
-              'All 4 therapist characters',
-              'Priority support',
-              'Early access to new features',
+              'Full memory & context',
+              'All therapist characters',
             ].map(f => (
-              <div key={f} style={{ display: 'flex', gap: 8,
-                                   marginBottom: 10, fontSize: 14,
-                                   color: '#6B6560', alignItems: 'flex-start' }}>
+              <div key={f} style={{
+                display: 'flex', gap: 8, marginBottom: 8,
+                fontSize: 14, color: '#6B6560',
+                alignItems: 'flex-start', marginTop: 8,
+              }}>
                 <span style={{ color: '#C96B2E', flexShrink: 0 }}>✓</span>
                 {f}
               </div>
             ))}
+            <button
+              onClick={() => navigate('/auth')}
+              style={{
+                width: '100%', marginTop: 20, padding: '13px',
+                borderRadius: 999,
+                border: '1.5px solid #C96B2E',
+                background: 'transparent', color: '#C96B2E',
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: 14, fontWeight: 500, cursor: 'pointer',
+                transition: 'all 150ms',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = '#C96B2E'
+                e.currentTarget.style.color = 'white'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = '#C96B2E'
+              }}
+            >Get started</button>
+          </div>
 
+          {/* 12 Month — best value */}
+          <div style={{
+            flex: '1 1 220px',
+            maxWidth: 260,
+            padding: '28px 28px',
+            borderRadius: 24,
+            background: 'rgba(201,107,46,0.05)',
+            backdropFilter: 'blur(16px)',
+            border: '2px solid rgba(201,107,46,0.3)',
+            position: 'relative',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              position: 'absolute', top: -14,
+              left: '50%', transform: 'translateX(-50%)',
+              padding: '4px 16px', borderRadius: 999,
+              background: '#C96B2E', color: 'white',
+              fontSize: 11, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              whiteSpace: 'nowrap',
+            }}>Best Value</div>
+            <div style={{
+              fontSize: 12, fontWeight: 700,
+              color: '#C96B2E', textTransform: 'uppercase',
+              letterSpacing: '0.06em', marginBottom: 8,
+            }}>12 Months</div>
+            <div style={{
+              fontSize: 13, color: '#C8C3BD',
+              textDecoration: 'line-through',
+            }}>{landingPricing.symbol}{landingPricing.yearlyOriginal}</div>
+            <div style={{
+              fontFamily: 'Fraunces, serif',
+              fontSize: 44, fontWeight: 300, color: '#C96B2E',
+            }}>
+              <span style={{ fontSize: 20 }}>{landingPricing.symbol}</span>{landingPricing.yearly}
+            </div>
+            <div style={{ fontSize: 13, color: '#9E8E7E' }}>
+              per year · {landingPricing.savings}
+            </div>
+            {[
+              'Everything in Monthly',
+              'Priority support',
+              'Early access to features',
+            ].map(f => (
+              <div key={f} style={{
+                display: 'flex', gap: 8, marginBottom: 8,
+                fontSize: 14, color: '#6B6560',
+                alignItems: 'flex-start', marginTop: 8,
+              }}>
+                <span style={{ color: '#C96B2E', flexShrink: 0 }}>✓</span>
+                {f}
+              </div>
+            ))}
             <button
               onClick={() => navigate('/auth')}
               className="btn-mesh"
-              style={{ width: '100%', marginTop: 24,
+              style={{ width: '100%', marginTop: 20,
                       padding: '13px', fontSize: 14 }}
             >
               Start free → Upgrade anytime
             </button>
           </div>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <p style={{ fontSize: 13, color: '#9E8E7E' }}>
+            Also available in 3-month and 6-month plans
+          </p>
         </div>
       </section>
 
