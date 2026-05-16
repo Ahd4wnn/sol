@@ -168,9 +168,9 @@ export default function Landing() {
             }}
             onMouseEnter={e => e.currentTarget.style.color = '#1A1714'}
             onMouseLeave={e => e.currentTarget.style.color = '#6B6560'}
-          >Sign in</button>
+          >Log in</button>
           <button
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate('/auth?mode=register')}
             className="btn-mesh"
             style={{ padding: '10px 22px', fontSize: 14 }}
           >Get started</button>
@@ -248,7 +248,7 @@ export default function Landing() {
           <div style={{ display: 'flex', alignItems: 'center',
                        gap: 16, flexWrap: 'wrap' }}>
             <button
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/auth?mode=register')}
               className="btn-mesh"
               style={{ padding: '15px 32px', fontSize: 16 }}
             >
@@ -641,7 +641,7 @@ export default function Landing() {
               </div>
             ))}
             <button
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/auth?mode=register')}
               style={{
                 width: '100%',
                 marginTop: 24,
@@ -709,7 +709,7 @@ export default function Landing() {
               </div>
             ))}
             <button
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/auth?mode=register')}
               style={{
                 width: '100%', marginTop: 20, padding: '13px',
                 borderRadius: 999,
@@ -784,7 +784,7 @@ export default function Landing() {
               </div>
             ))}
             <button
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/auth?mode=register')}
               className="btn-mesh"
               style={{ width: '100%', marginTop: 20,
                       padding: '13px', fontSize: 14 }}
@@ -878,7 +878,7 @@ export default function Landing() {
           </p>
 
           <button
-            onClick={() => navigate('/auth')}
+            onClick={() => navigate('/auth?mode=register')}
             className="btn-mesh"
             style={{
               padding: '16px 40px',
