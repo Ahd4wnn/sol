@@ -56,17 +56,12 @@ export default function Auth() {
 
   // Slide state
   const [slideIndex, setSlideIndex] = useState(0)
-  const [slideVisible, setSlideVisible] = useState(true)
   const intervalRef = useRef(null)
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setSlideVisible(false)
-      setTimeout(() => {
-        setSlideIndex(i => (i + 1) % SLIDES.length)
-        setSlideVisible(true)
-      }, 650)
-    }, 5000)
+      setSlideIndex(i => (i + 1) % SLIDES.length)
+    }, 4500)
     return () => clearInterval(intervalRef.current)
   }, [])
 
@@ -77,19 +72,10 @@ export default function Auth() {
 
   const goToSlide = (index) => {
     clearInterval(intervalRef.current)
-    setSlideVisible(false)
-    setTimeout(() => {
-      setSlideIndex(index)
-      setSlideVisible(true)
-    }, 400)
-    // Restart auto-advance
+    setSlideIndex(index)
     intervalRef.current = setInterval(() => {
-      setSlideVisible(false)
-      setTimeout(() => {
-        setSlideIndex(i => (i + 1) % SLIDES.length)
-        setSlideVisible(true)
-      }, 650)
-    }, 5000)
+      setSlideIndex(i => (i + 1) % SLIDES.length)
+    }, 4500)
   }
 
   const handlePromoCheck = async (code) => {
@@ -262,15 +248,18 @@ export default function Auth() {
 
         /* Slide content */
         .auth-slide {
-          transition: opacity 0.6s ease-in-out;
+          animation: slideEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
 
-        .auth-slide.hidden {
-          opacity: 0;
-        }
-
-        .auth-slide.visible {
-          opacity: 1;
+        @keyframes slideEnter {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .auth-slide-eyebrow {
@@ -279,6 +268,8 @@ export default function Auth() {
           font-weight: 400;
           margin-bottom: 8px;
           letter-spacing: 0.01em;
+          animation: slideEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: 0ms;
         }
 
         .auth-slide-headline {
@@ -290,6 +281,8 @@ export default function Auth() {
           line-height: 1.1;
           margin-bottom: 16px;
           white-space: pre-line;
+          animation: slideEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: 60ms;
         }
 
         .auth-slide-sub {
@@ -297,6 +290,8 @@ export default function Auth() {
           color: rgba(255,255,255,0.7);
           line-height: 1.65;
           max-width: 320px;
+          animation: slideEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: 120ms;
         }
 
         /* Slide dots */
@@ -613,9 +608,8 @@ export default function Auth() {
             {/* Slide */}
             <div>
               <div
-                className={`auth-slide ${
-                  slideVisible ? 'visible' : 'hidden'
-                }`}
+                key={slideIndex}
+                className="auth-slide"
               >
                 <p className="auth-slide-eyebrow">
                   {slide.eyebrow}
