@@ -129,7 +129,7 @@ export default function Auth() {
               value: referral?.value || promoCode,
             })
             clearReferral()
-          } catch {}
+          } catch { }
         }
         navigate('/onboarding')
       }
@@ -627,9 +627,8 @@ export default function Auth() {
                 {SLIDES.map((_, i) => (
                   <button
                     key={i}
-                    className={`auth-dot ${
-                      i === slideIndex ? 'active' : ''
-                    }`}
+                    className={`auth-dot ${i === slideIndex ? 'active' : ''
+                      }`}
                     onClick={() => goToSlide(i)}
                     aria-label={`Slide ${i + 1}`}
                   />
@@ -684,7 +683,7 @@ export default function Auth() {
                   onKeyDown={e =>
                     e.key === 'Enter' && handleSubmit()
                   }
-                  placeholder="you@university.edu"
+                  placeholder="you@gmail.com"
                   autoComplete="email"
                   style={{ paddingRight: 16 }}
                 />
@@ -748,26 +747,26 @@ export default function Auth() {
                       fontWeight: promoCode ? 600 : 400,
                       borderColor:
                         promoValid === true ? '#3D7A5F'
-                        : promoValid === false ? '#C0392B'
-                        : undefined,
+                          : promoValid === false ? '#C0392B'
+                            : undefined,
                     }}
                   />
                   {(checkingPromo ||
                     promoValid !== null) && (
-                    <span
-                      className="auth-input-status"
-                      style={{
-                        color:
-                          promoValid === true ? '#3D7A5F'
-                          : promoValid === false ? '#C0392B'
-                          : '#C8C3BD',
-                      }}
-                    >
-                      {checkingPromo ? '...'
-                        : promoValid === true ? '✓'
-                        : '✗'}
-                    </span>
-                  )}
+                      <span
+                        className="auth-input-status"
+                        style={{
+                          color:
+                            promoValid === true ? '#3D7A5F'
+                              : promoValid === false ? '#C0392B'
+                                : '#C8C3BD',
+                        }}
+                      >
+                        {checkingPromo ? '...'
+                          : promoValid === true ? '✓'
+                            : '✗'}
+                      </span>
+                    )}
                 </div>
                 {promoData && (
                   <div className="auth-promo-success">
