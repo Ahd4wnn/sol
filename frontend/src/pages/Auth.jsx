@@ -65,8 +65,8 @@ export default function Auth() {
       setTimeout(() => {
         setSlideIndex(i => (i + 1) % SLIDES.length)
         setSlideVisible(true)
-      }, 500)
-    }, 4500)
+      }, 650)
+    }, 5000)
     return () => clearInterval(intervalRef.current)
   }, [])
 
@@ -81,15 +81,15 @@ export default function Auth() {
     setTimeout(() => {
       setSlideIndex(index)
       setSlideVisible(true)
-    }, 300)
+    }, 400)
     // Restart auto-advance
     intervalRef.current = setInterval(() => {
       setSlideVisible(false)
       setTimeout(() => {
         setSlideIndex(i => (i + 1) % SLIDES.length)
         setSlideVisible(true)
-      }, 500)
-    }, 4500)
+      }, 650)
+    }, 5000)
   }
 
   const handlePromoCheck = async (code) => {
@@ -262,17 +262,15 @@ export default function Auth() {
 
         /* Slide content */
         .auth-slide {
-          transition: opacity 0.5s ease, transform 0.5s ease;
+          transition: opacity 0.6s ease-in-out;
         }
 
         .auth-slide.hidden {
           opacity: 0;
-          transform: translateY(12px);
         }
 
         .auth-slide.visible {
           opacity: 1;
-          transform: translateY(0);
         }
 
         .auth-slide-eyebrow {
